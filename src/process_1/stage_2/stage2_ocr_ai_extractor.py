@@ -33,7 +33,7 @@ class Stage2OcrAiExtractor:
         headers = {
             "Authorization": f"Bearer {api_key}",
             "HTTP-Referer": "http://localhost:8000",
-            "X-Title": "Finance Automation AI Backend",
+            "X-Title": "TOTM Finance Automation Backend",
             "Content-Type": "application/json"
         }
 

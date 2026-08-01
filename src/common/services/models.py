@@ -23,3 +23,16 @@ class InvoiceAuditRecord(Base):
     match_type = Column(String(50), nullable=False)         # 4_WAY_MATCH, 3_WAY_MATCH, 2_WAY_MATCH
     status = Column(String(50), nullable=False)             # SQL_RECORD_INSERTED, POSTED_TO_SAP, MANUALLY_APPROVED, REJECTED_BY_HUMAN
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class EmployeeClaimRecord(Base):
+    __tablename__ = 'employee_claims'
+    id = Column(Integer, primary_key=True, index=True)
+    ref_no = Column(String(50), nullable=False)
+    gl_code = Column(String(50), nullable=False)
+    group_name = Column(String(100), nullable=False)
+    receipt_no = Column(String(100), nullable=True)
+    receipt_date = Column(String(50), nullable=True)
+    claimable_amt = Column(Float, nullable=False)
+    hod_approval = Column(String(50), nullable=False)
+    status = Column(String(50), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)

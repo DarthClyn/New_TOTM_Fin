@@ -26,3 +26,20 @@ class InvoiceAuditRecordResponse(InvoiceAuditRecordCreate):
 
     class Config:
         from_attributes = True  # Pydantic v2 compatible ORM reader flag
+
+class EmployeeClaimRecordCreate(BaseModel):
+    ref_no: str
+    gl_code: str
+    group_name: str
+    receipt_no: Optional[str] = None
+    receipt_date: Optional[str] = None
+    claimable_amt: float
+    hod_approval: str
+    status: str
+
+class EmployeeClaimRecordResponse(EmployeeClaimRecordCreate):
+    id: int
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

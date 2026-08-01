@@ -11,7 +11,7 @@
 
 window.Stage3AiMatcher = {
     fixedModel: 'nvidia/nemotron-3-super-120b-a12b:free',
-    
+
     systemPrompt: `You are an expert Enterprise Audit & Invoice Matching AI.
 Perform a strict 2-Way / 3-Way / 4-Way match between extracted Invoice Key-Values and Supporting Documents (Purchase Order, Delivery Order, Contract Agreement).
 
@@ -65,7 +65,7 @@ Output valid JSON:
             return;
         }
 
-        const activeApiKey = apiKey || localStorage.getItem('docu_openrouter_key') || '';
+        const activeApiKey = apiKey || localStorage.getItem('openRouterApiKey') || '';
         if (!activeApiKey) {
             document.getElementById('configModal').classList.remove('hidden');
             window.SidePanelLog.log('p1 stage 3', 'doc matching failed: OpenRouter API key missing');
@@ -89,7 +89,7 @@ Output valid JSON:
                 headers: {
                     'Authorization': `Bearer ${activeApiKey}`,
                     'HTTP-Referer': window.location.href,
-                    'X-Title': 'Finance Automation AI Stage 3',
+                    'X-Title': 'TOTM Finance Automation Stage 3',
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
@@ -107,7 +107,7 @@ Output valid JSON:
                 try {
                     const errJson = await response.json();
                     errorMsg = errJson.error?.message || errorMsg;
-                } catch (e) {}
+                } catch (e) { }
 
                 if (response.status === 401 || response.status === 403) {
                     document.getElementById('configModal').classList.remove('hidden');
@@ -155,14 +155,14 @@ Output valid JSON:
                     try {
                         const controller = new AbortController();
                         const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
-                        
+
                         const recheckRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                             method: 'POST',
                             signal: controller.signal,
                             headers: {
                                 'Authorization': `Bearer ${apiKey}`,
                                 'HTTP-Referer': window.location.href,
-                                'X-Title': 'Finance Automation AI Re-Checker',
+                                'X-Title': 'TOTM Finance Automation Re-Checker',
                                 'Content-Type': 'application/json'
                             },
                             body: JSON.stringify({
@@ -187,10 +187,10 @@ Output valid JSON:
                                 window.SidePanelLog.log('p1 stage 3', `AI re-checker cleared discrepancy for '${row.field_name}'`);
                             }
                         }
-                        
+
                         // Add a small 1s delay to prevent hitting free-tier rate limits
                         await new Promise(resolve => setTimeout(resolve, 1000));
-                        
+
                     } catch (e) {
                         console.warn('Re-checker sub-step skipped or timed out:', e);
                         window.SidePanelLog.log('p1 stage 3', `Re-checker skipped for '${row.field_name}' due to timeout/error`);
@@ -265,13 +265,13 @@ Output valid JSON:
                         </thead>
                         <tbody>
                             ${filteredResults.map((row, idx) => {
-                                let badgeClass = 'badge-match';
-                                if (row.status === 'DISCREPANCY') badgeClass = 'badge-discrepancy';
-                                else if (row.status === 'PARTIAL_MATCH') badgeClass = 'badge-partial';
+                    let badgeClass = 'badge-match';
+                    if (row.status === 'DISCREPANCY') badgeClass = 'badge-discrepancy';
+                    else if (row.status === 'PARTIAL_MATCH') badgeClass = 'badge-partial';
 
-                                const isMatched = row.status === 'MATCHED';
+                    const isMatched = row.status === 'MATCHED';
 
-                                return `
+                    return `
                                     <tr>
                                         <td class="font-bold">${row.field_name || '-'}</td>
                                         <td id="inv_val_${idx}">${typeof row.invoice_value === 'object' ? JSON.stringify(row.invoice_value) : (row.invoice_value ?? '-')}</td>
@@ -296,7 +296,7 @@ Output valid JSON:
                                         </td>
                                     </tr>
                                 `;
-                            }).join('')}
+                }).join('')}
                         </tbody>
                     </table>
                 `;
@@ -346,7 +346,7 @@ Output valid JSON:
         }
 
         window.SidePanelLog.log('human approval', `human approval approved for field '${row.field_name}'`);
-        
+
         // CHECK IF ALL REVIEWS ARE NOW RESOLVED
         this.checkAutoCommitToDb();
     },
@@ -374,7 +374,7 @@ Output valid JSON:
 
         const row = this.matchData.match_results[index];
         const modal = document.getElementById('humanReviewModal');
-        
+
         document.getElementById('reviewFieldName').textContent = row.field_name;
         document.getElementById('reviewInvoiceVal').value = typeof row.invoice_value === 'object' ? JSON.stringify(row.invoice_value) : (row.invoice_value ?? '');
         document.getElementById('reviewDocSource').textContent = row.supporting_doc_source || 'Supporting Document';

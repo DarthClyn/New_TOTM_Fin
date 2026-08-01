@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTM Finance Automation - Process: Supplier Invoice Matching</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tesseract.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- pdf.js CDN for PDF page rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <link rel="stylesheet" href="../common/ui/style.css">
+</head>
+
+<body>
+    <div class="app-layout-wrapper">
+        <!-- Main Content App Container -->
+        <div class="app-container">
+            <!-- Header -->
+            <header class="app-header">
+                <div class="logo-container">
+                    <div class="logo-icon">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>Finance Automation <span>AI</span></h1>
+                        <p>Process: Supplier Invoice Matching</p>
+                    </div>
+                </div>
+
+                <div class="header-actions">
+                    <button id="configBtn" class="btn btn-secondary" style="margin-right: 12px;">
+                        <i class="fa-solid fa-key"></i> API Key Settings
+                    </button>
+                    <a href="../../index.html" class="btn btn-secondary" style="text-decoration: none;">
+                        <i class="fa-solid fa-home"></i> Home
+                    </a>
+                </div>
+            </header>
+
+            <!-- Main Workspace: Vertical Stack (Stage 1 -> Stage 2 -> Stage 3 -> Stage 4) -->
+            <main class="main-workspace-vertical">
+
+                <!-- STAGE 1: DOCUMENT SELECTION & CONFIGURATION -->
+                <section class="panel-full stage-panel">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-folder-open"></i> 1. Document Selection & Configuration</h2>
+                        <span class="badge" id="fileStatusBadge">Ready</span>
+                    </div>
+
+                    <!-- Scenario Selection & Mode Toggle Bar -->
+                    <div class="scenario-selector-card">
+                        <div class="mode-switch-header">
+                            <label for="scenarioSelect" class="scenario-label">Select AI Processing Scenario
+                                Set:</label>
+
+                            <div class="toggle-mode-group">
+                                <button id="modeDefaultBtn" class="mode-toggle-btn active">
+                                    <i class="fa-solid fa-layer-group"></i> Default Presets
+                                </button>
+                                <button id="modeCustomBtn" class="mode-toggle-btn">
+                                    <i class="fa-solid fa-upload"></i> Custom Upload Files
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="defaultScenarioSelectContainer">
+                            <select id="scenarioSelect" class="form-select scenario-select">
+                                <option value="set1">Set 1: 4-Way Match (TLPL SAP)</option>
+                                <option value="set2" selected>Set 2: 3-Way Match (TTS SQL)</option>
+                                <option value="set3">Set 3: 2-Way Match (Services)</option>
+                            </select>
+                        </div>
+
+                        <div id="customUploadContainer" class="custom-upload-box hidden">
+                            <input type="file" id="customContextFileInput" accept=".txt,.csv" multiple
+                                class="file-input">
+                            <div class="custom-upload-prompt">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                                <span>Upload Supporting Documents (.txt, .csv)</span>
+                                <button class="btn btn-primary btn-xs"
+                                    onclick="document.getElementById('customContextFileInput').click()">
+                                    <i class="fa-solid fa-plus"></i> Add Supporting Docs
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Invoice Selector Dropzone -->
+                    <div class="invoice-selector-box">
+                        <div class="section-title"><i class="fa-solid fa-file-upload"></i> Main Invoice Document
+                            Selector</div>
+                        <div id="dropzone" class="dropzone">
+                            <input type="file" id="fileInput" accept="image/*,.pdf,.txt,.csv" class="file-input">
+                            <div class="dropzone-content">
+                                <div class="upload-icon-wrapper">
+                                    <i class="fa-solid fa-file-pdf icon-pdf"></i>
+                                    <i class="fa-solid fa-file-image icon-img"></i>
+                                    <i class="fa-solid fa-file-lines icon-txt"></i>
+                                </div>
+                                <h3>Select or Drop Main Invoice</h3>
+                                <p>Supports Images (PNG/JPG), PDFs (Text & Scanned), and Text (.txt, .csv)</p>
+                                <button class="btn btn-primary btn-sm"
+                                    onclick="document.getElementById('fileInput').click()">
+                                    <i class="fa-solid fa-folder-open"></i> Browse Custom Invoice
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Invoice Preview Area -->
+                        <div id="previewContainer" class="preview-container hidden">
+                            <div class="preview-toolbar">
+                                <span id="fileNameDisplay" class="file-name"><i class="fa-solid fa-paperclip"></i>
+                                    invoice.pdf</span>
+                                <span id="fileTypeBadge" class="badge">PDF</span>
+                                <button id="reuploadBtn" class="btn-icon" title="Change file"><i
+                                        class="fa-solid fa-rotate-left"></i></button>
+                            </div>
+                            <div class="media-viewer">
+                                <img id="imagePreview" class="hidden" alt="Document Preview">
+                                <canvas id="pdfCanvas" class="hidden"></canvas>
+                                <div id="textPreview" class="text-preview hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Supporting Documents Editable Preview Cards Grid -->
+                    <div class="scenario-cards-section">
+                        <div class="section-title"><i class="fa-solid fa-copy"></i> Matching Supporting Documents
+                            (Editable Text Cards)</div>
+
+                        <div id="scenarioDocsGrid" class="scenario-docs-grid">
+                            <!-- Rendered dynamically -->
+                        </div>
+
+                        <div class="save-changes-bar">
+                            <button id="saveDocChangesBtn" class="btn btn-success">
+                                <i class="fa-solid fa-floppy-disk"></i> Save Supporting Document Changes
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- RUN ALL STAGES BUTTON BELOW DOCUMENT SELECTION -->
+                    <div class="run-all-banner-card">
+                        <button id="runAllStagesBtn" class="btn btn-accent btn-block btn-lg">
+                            <i class="fa-solid fa-play"></i> Run All Stages (Automated End-to-End Invoice Match)
+                        </button>
+                    </div>
+                </section>
+
+
+                <!-- STAGE 2: VISION OCR & AI EXTRACTION -->
+                <section class="panel-full stage-panel">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-brain"></i> 2. Vision OCR & AI Extraction</h2>
+                        <span class="badge badge-accent">NVIDIA Nemotron 3 Super 120B</span>
+                    </div>
+
+                    <!-- Stage 2 Pipeline Trigger & OCR Progress Bar -->
+                    <div class="action-card">
+                        <button id="runPipelineBtn" class="btn btn-primary btn-block btn-lg">
+                            <i class="fa-solid fa-bolt"></i> Run Stage 2 (OCR + AI Key Extraction)
+                        </button>
+
+                        <div id="ocrProgress" class="progress-bar-container hidden">
+                            <div class="progress-info">
+                                <span id="ocrProgressStatus">Processing OCR...</span>
+                                <span id="ocrProgressPercent">0%</span>
+                            </div>
+                            <div class="progress-track">
+                                <div id="ocrProgressBar" class="progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key-Value Mapping Results -->
+                    <div class="results-container">
+                        <div class="results-header">
+                            <h3><i class="fa-solid fa-border-all"></i> Extracted Invoice Key Details</h3>
+                            <div class="export-actions">
+                                <button id="downloadCsvBtn" class="btn btn-xs btn-outline" disabled><i
+                                        class="fa-solid fa-file-csv"></i> Export CSV</button>
+                            </div>
+                        </div>
+
+                        <div class="results-body">
+                            <div id="emptyState" class="empty-state">
+                                <i class="fa-solid fa-diagram-project"></i>
+                                <p>No key-value details extracted yet.</p>
+                                <span>Click "Run All Stages" or "Run Stage 2" above to extract invoice key
+                                    details.</span>
+                            </div>
+                            <div id="keyValueGrid" class="key-value-grid hidden"></div>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- STAGE 3: AI MULTI-WAY DOCUMENT MATCHING -->
+                <section class="panel-full stage-panel">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-code-compare"></i> 3. AI-Based Document Matching & Verification</h2>
+                        <span class="badge badge-accent">OCR Normalizer & Re-Checker AI</span>
+                    </div>
+
+                    <!-- STAGE 3 SPECIFIC PROGRESS LOADER CARD -->
+                    <div class="action-card" id="stage3ActionCard">
+                        <button id="runMatchBtn" class="btn btn-accent btn-block btn-lg">
+                            <i class="fa-solid fa-code-compare"></i> Run Stage 3 (AI Multi-Way Document Match)
+                        </button>
+                        <div id="stage3Loader" class="loader-box hidden">
+                            <div class="loader-spinner-bar">
+                                <i class="fa-solid fa-spinner fa-spin"></i>
+                                <span id="stage3LoaderStatus">Auditing Multi-Way Match with AI & Re-Checker...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Match Results Banner & Verification Table -->
+                    <div class="results-container">
+                        <div id="matchSummaryBox" class="match-summary-banner hidden"></div>
+
+                        <div class="results-body">
+                            <div id="emptyStage3State" class="empty-state">
+                                <i class="fa-solid fa-scale-balanced"></i>
+                                <p>No multi-way matching analysis executed yet.</p>
+                                <span>Run the automated pipeline to audit the main invoice against supporting
+                                    documents.</span>
+                            </div>
+                            <div id="matchTableContainer" class="hidden"></div>
+                        </div>
+                    </div>
+                </section>
+
+
+                <!-- STAGE 4: LOCAL SQL DATABASE INSERTION & VIEWER -->
+                <section class="panel-full stage-panel">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-database"></i> 4. SQL Database Commit & Local DB Inspection</h2>
+                        <span class="badge badge-accent">SQLAlchemy & SQLite ORM</span>
+                    </div>
+
+                    <div class="action-card">
+                        <button id="pushToDbBtn" class="btn btn-success btn-block btn-lg">
+                            <i class="fa-solid fa-cloud-arrow-up"></i> Push Extracted & Audited Invoice to SQL Database
+                        </button>
+                    </div>
+
+                    <!-- SQL DATABASE VIEWER TABLE -->
+                    <div class="sql-db-viewer-card">
+                        <div class="sql-db-header">
+                            <div class="sql-db-title">
+                                <h3><i class="fa-solid fa-table-list"></i> Local SQL Database Viewer (SQLAlchemy)</h3>
+                                <p>Live inspection of records committed to <code>local_sql_accounting.db</code></p>
+                            </div>
+                            <div class="sql-db-actions">
+                                <button class="btn btn-primary btn-sm"
+                                    onclick="window.Stage4Database.renderDatabaseViewer()">
+                                    <i class="fa-solid fa-rotate"></i> Refresh Data
+                                </button>
+                                <button class="btn btn-xs btn-outline"
+                                    onclick="window.Stage4Database.clearDatabaseRecords()" title="Clear DB Records">
+                                    <i class="fa-solid fa-trash-can"></i> Clear Table
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="sql-db-body">
+                            <div id="sqlDbTableContainer" class="sql-table-wrapper">
+                                <!-- Rendered dynamically by Stage4Database -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+
+        <!-- RIGHT HAND LOG CENTER SIDEPANEL -->
+        <aside class="log-center-panel">
+            <div class="log-panel-header">
+                <h3><i class="fa-solid fa-terminal"></i> Process Log Center</h3>
+                <button class="btn-icon" onclick="window.SidePanelLog.clear()" title="Clear Logs"><i
+                        class="fa-solid fa-trash-can"></i></button>
+            </div>
+            <div id="logCenterList" class="log-center-list">
+                <!-- Log entries auto-inserted here -->
+            </div>
+        </aside>
+    </div>
+
+    <!-- HUMAN REVIEW DRAWER MODAL -->
+    <div id="humanReviewModal" class="modal-overlay hidden">
+        <div class="modal-content review-modal-content">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-user-check"></i> Human Auditor Review Panel</h3>
+                <button class="btn-icon"
+                    onclick="document.getElementById('humanReviewModal').classList.add('hidden')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="review-field-title">
+                    Reviewing Field: <span id="reviewFieldName" class="badge badge-accent">vendor_name</span>
+                </div>
+
+                <div class="review-split-grid">
+                    <!-- Left: Invoice Extracted Field -->
+                    <div class="review-card">
+                        <div class="review-card-title"><i class="fa-solid fa-file-invoice"></i> Extracted Invoice Value
+                        </div>
+                        <textarea id="reviewInvoiceVal" class="form-input" rows="3"></textarea>
+                    </div>
+
+                    <!-- Right: Supporting Document Source & Value -->
+                    <div class="review-card">
+                        <div class="review-card-title"><i class="fa-solid fa-file-lines"></i> Supporting Doc Source
+                            (<span id="reviewDocSource">PO.txt</span>)</div>
+                        <div id="reviewDocVal" class="review-doc-value-box"></div>
+                    </div>
+                </div>
+
+                <div class="review-notes-box">
+                    <strong>AI Auditor Verification Notes:</strong>
+                    <p id="reviewNotesText"></p>
+                </div>
+            </div>
+            <div class="modal-footer review-footer">
+                <button class="btn btn-secondary"
+                    onclick="document.getElementById('humanReviewModal').classList.add('hidden')">Cancel</button>
+                <button class="btn btn-danger" onclick="window.Stage3AiMatcher.quickRejectFieldMatch()"><i
+                        class="fa-solid fa-xmark"></i> Reject Discrepancy</button>
+                <button class="btn btn-primary" onclick="window.Stage3AiMatcher.overrideFieldMatch()"><i
+                        class="fa-solid fa-pen-to-square"></i> Override & Approve</button>
+                <button class="btn btn-success" onclick="window.Stage3AiMatcher.approveFieldMatch()"><i
+                        class="fa-solid fa-check-double"></i> Approve Match</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../common/ui/api_key_modal.js"></script>
+    <script src="./stage_1/stage1_document_selector.js"></script>
+    <script src="./stage_2/stage2_ocr_ai_extractor.js"></script>
+    <script src="./stage_3/stage3_ai_matcher.js"></script>
+    <script src="./stage_4/stage4_db.js"></script>
+    <script src="../common/ui/sidepanel.js"></script>
+    <script src="app.js"></script>
+</body>
+
+</html>

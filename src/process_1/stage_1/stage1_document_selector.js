@@ -16,22 +16,24 @@ window.Stage1DocumentSelector = {
         set1: {
             name: "Set 1: 4-Way Match (TLPL SAP)",
             files: [
-                { id: "agr", name: "AGR.txt", path: "default_input_files_stage1/set1/AGR.txt" },
-                { id: "do", name: "DO.txt", path: "default_input_files_stage1/set1/DO.txt" },
-                { id: "po", name: "PO.txt", path: "default_input_files_stage1/set1/PO.txt" }
+                { id: "agr", name: "AGR.txt", path: "stage_1/default_input_files_stage1/set1/AGR.txt" },
+                { id: "do", name: "DO.txt", path: "stage_1/default_input_files_stage1/set1/DO.txt" },
+                { id: "po", name: "PO.txt", path: "stage_1/default_input_files_stage1/set1/PO.txt" }
             ]
         },
         set2: {
             name: "Set 2: 3-Way Match (TTS SQL)",
+            entity: "TTSPL_SQL_DB",
             files: [
-                { id: "do", name: "DO.txt", path: "default_input_files_stage1/set2/DO.txt" },
-                { id: "po", name: "PO.txt", path: "default_input_files_stage1/set2/PO.txt" }
+                { id: "do", name: "DO.txt", path: "stage_1/default_input_files_stage1/set2/DO.txt" },
+                { id: "po", name: "PO.txt", path: "stage_1/default_input_files_stage1/set2/PO.txt" }
             ]
         },
         set3: {
-            name: "Set 3: 2-Way Match (Services)",
+            name: "Set 3: 2-Way Match (IBPL Services)",
+            entity: "IBPL_SQL_DB",
             files: [
-                { id: "agr", name: "AGR.txt", path: "default_input_files_stage1/set3/AGR.txt" }
+                { id: "agr", name: "AGR.txt", path: "stage_1/default_input_files_stage1/set3/AGR.txt" }
             ]
         }
     },

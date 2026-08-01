@@ -37,7 +37,7 @@ class Stage3AiMatcher:
         headers = {
             "Authorization": f"Bearer {api_key}",
             "HTTP-Referer": "http://localhost:8000",
-            "X-Title": "Finance Automation AI Stage 3",
+            "X-Title": "TOTM Finance Automation Stage 3",
             "Content-Type": "application/json"
         }
 

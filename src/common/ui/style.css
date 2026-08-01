@@ -156,6 +156,9 @@ body {
 .cat-stage1 { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
 .cat-stage2 { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
 .cat-stage3 { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+.cat-stage4 { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.cat-system { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+.cat-recheck { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
 .cat-recheck { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
 
 .log-msg-clean {
@@ -780,10 +783,24 @@ body {
     border-radius: 4px;
 }
 
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
 .badge-match {
     background: #d1fae5;
     color: #065f46;
     border: 1px solid #a7f3d0;
+}
+
+.badge-accent {
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
 }
 
 .badge-discrepancy {

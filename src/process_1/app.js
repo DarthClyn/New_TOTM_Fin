@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const apiKey = localStorage.getItem('docu_openrouter_key') || '';
+        const apiKey = localStorage.getItem('openRouterApiKey') || '';
         if (!apiKey) {
             document.getElementById('configModal').classList.remove('hidden');
             alert('Please enter your OpenRouter API Key in settings first.');
@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const runMatchBtn = document.getElementById('runMatchBtn');
     if (runMatchBtn) {
         runMatchBtn.addEventListener('click', () => {
-            const apiKey = localStorage.getItem('docu_openrouter_key') || '';
+            const apiKey = localStorage.getItem('openRouterApiKey') || '';
             window.Stage3AiMatcher.runAiMatch(apiKey);
         });
     }
@@ -179,45 +179,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Modal API Key Handlers
-    const configBtn = document.getElementById('configBtn');
-    const configModal = document.getElementById('configModal');
-    const closeModalBtn = document.getElementById('closeModalBtn');
-    const saveConfigBtn = document.getElementById('saveConfigBtn');
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const toggleKeyVisibility = document.getElementById('toggleKeyVisibility');
-
-    if (configBtn) {
-        configBtn.addEventListener('click', () => {
-            apiKeyInput.value = localStorage.getItem('docu_openrouter_key') || '';
-            configModal.classList.remove('hidden');
-        });
-    }
-
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', () => configModal.classList.add('hidden'));
-    }
-
-    if (saveConfigBtn) {
-        saveConfigBtn.addEventListener('click', () => {
-            const key = apiKeyInput.value.trim();
-            if (key) {
-                localStorage.setItem('docu_openrouter_key', key);
-                configModal.classList.add('hidden');
-                alert('API Key saved to local cache!');
-            }
-        });
-    }
-
-    if (toggleKeyVisibility) {
-        toggleKeyVisibility.addEventListener('click', () => {
-            if (apiKeyInput.type === 'password') {
-                apiKeyInput.type = 'text';
-                toggleKeyVisibility.innerHTML = '<i class="fa-regular fa-eye-slash"></i>';
-            } else {
-                apiKeyInput.type = 'password';
-                toggleKeyVisibility.innerHTML = '<i class="fa-regular fa-eye"></i>';
-            }
-        });
-    }
+    // Modal logic is now handled by common/ui/api_key_modal.js
 });

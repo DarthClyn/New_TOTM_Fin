@@ -1,13 +1,13 @@
 /**
  * Process Log Center Module
- * Human-readable execution step logging for Stage 1, Stage 2, and Stage 3
+ * Human-readable execution step logging for all processes and stages.
  */
 
 window.SidePanelLog = {
     logs: [],
 
     init() {
-        this.log('p1 stage 1', 'Log Center ready. Select scenario or upload document.');
+        this.log('system', 'Log Center ready.');
     },
 
     log(stageTag, message) {
@@ -33,7 +33,9 @@ window.SidePanelLog = {
             let catClass = 'cat-stage1';
             if (item.stageTag.includes('stage 2') || item.stageTag.includes('stage2')) catClass = 'cat-stage2';
             else if (item.stageTag.includes('stage 3') || item.stageTag.includes('stage3')) catClass = 'cat-stage3';
+            else if (item.stageTag.includes('stage 4') || item.stageTag.includes('stage4')) catClass = 'cat-stage4';
             else if (item.stageTag.includes('human')) catClass = 'cat-recheck';
+            else if (item.stageTag === 'system') catClass = 'cat-system';
 
             const el = document.createElement('div');
             el.className = 'log-entry';

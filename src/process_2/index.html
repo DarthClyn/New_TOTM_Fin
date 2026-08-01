@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process 2: Employee Claims Automation</title>
+    <link rel="stylesheet" href="../common/ui/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-layout-wrapper">
+        <div class="app-container">
+            <header class="app-header">
+                <div class="logo-container">
+                    <div class="logo-icon">
+                        <i class="fa-solid fa-gears"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>Finance Automation <span>AI</span></h1>
+                        <p>Process: Employee Claims Automation</p>
+                    </div>
+                </div>
+                
+                <div class="header-actions">
+                    <button id="configBtn" class="btn btn-secondary" style="margin-right: 12px;">
+                        <i class="fa-solid fa-key"></i> API Key
+                    </button>
+                    <a href="../../index.html" class="btn btn-secondary" style="text-decoration: none;">
+                        <i class="fa-solid fa-home"></i> Home
+                    </a>
+                </div>
+            </header>
+
+            <!-- Main Workspace: Vertical Stack -->
+            <main class="main-workspace-vertical">
+                <section class="panel-full stage-panel">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-file-invoice"></i> 1. Ingesting Claim Data</h2>
+                        <span class="badge badge-match">Ready</span>
+                    </div>
+
+                    <div class="card p-4">
+                        <div style="margin-bottom: 24px;">
+                            <h3 class="text-lg font-bold" style="margin-bottom: 12px;">Ingested Claims Table</h3>
+                            <button class="btn btn-primary" id="saveClaimsBtn">
+                                <i class="fa-solid fa-save"></i> Save Changes
+                            </button>
+                        </div>
+                        
+                        <div id="claimsTableContainer" class="table-container">
+                            <!-- Populated by JS -->
+                            <div class="empty-state">
+                                <p>No claims ingested yet. Click 'Fetch New Claims' to load data.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Stage 1 Part 2: Policy Config -->
+                    <div class="card p-4 mt-4">
+                        <div class="flex-between mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold">Claim Policy Configuration</h3>
+                                <p class="text-muted" style="font-size: 0.9rem;">Set the rules that AI will use to evaluate the claims.</p>
+                            </div>
+                            <div>
+                                <button class="btn btn-outline" onclick="document.getElementById('policyUpload').click()" style="margin-right: 8px;">
+                                    <i class="fa-solid fa-file-upload"></i> Upload Policy (.txt/.pdf)
+                                </button>
+                                <input type="file" id="policyUpload" accept=".txt,.pdf" style="display: none;">
+                                <button class="btn btn-success" id="savePolicyBtn">
+                                    <i class="fa-solid fa-save"></i> Save Policy
+                                </button>
+                            </div>
+                        </div>
+                        <textarea id="policyText" class="form-input" style="width: 100%; height: 80px; font-family: inherit; margin-top: 16px; margin-bottom: 16px;">HOD approval is required; automatically reject if not approved.
+Claim amount must be under 50,000 SGD.</textarea>
+                    </div>
+
+                    <!-- RUN ALL STAGES (Added back per request) -->
+                    <div style="margin-top: 16px; margin-bottom: 24px; text-align: center;">
+                        <button id="runProcessBtn" class="btn btn-accent btn-block btn-lg">
+                            <i class="fa-solid fa-play"></i> Run All Stages (Automated Process)
+                        </button>
+                    </div>
+                </section>
+
+                <!-- STAGE 2: AI POLICY CHECKER -->
+                <section class="panel-full stage-panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <h2><i class="fa-solid fa-robot"></i> 2. AI Policy Checker</h2>
+                            <span class="badge" id="stage2Status">Pending</span>
+                        </div>
+                        <button class="btn btn-primary" id="runStage2Btn">
+                            <i class="fa-solid fa-play"></i> Run Policy Checker
+                        </button>
+                    </div>
+                    <div class="card p-4" id="stage2Content">
+                        <div class="empty-state">
+                            <p>AI Policy Check results will appear here after running the process.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 3: GL CODE MAPPING -->
+                <section class="panel-full stage-panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <h2><i class="fa-solid fa-sitemap"></i> 3. GL Code Mapping</h2>
+                            <span class="badge" id="stage3Status">Pending</span>
+                        </div>
+                        <button class="btn btn-primary" id="runStage3Btn">
+                            <i class="fa-solid fa-play"></i> Run GL Mapping
+                        </button>
+                    </div>
+                    <div class="card p-4" id="stage3Content">
+                        <div class="empty-state">
+                            <p>GL Mapping table will appear here.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- STAGE 4: SQL DATABASE PUSH -->
+                <section class="panel-full stage-panel">
+                    <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <h2><i class="fa-solid fa-database"></i> 4. Database Push</h2>
+                            <span class="badge" id="stage4Status">Pending</span>
+                        </div>
+                        <button class="btn btn-success" id="runStage4Btn">
+                            <i class="fa-solid fa-play"></i> Push to SQL DB
+                        </button>
+                    </div>
+                    <div class="card p-4" id="stage4Content">
+                        <div class="empty-state">
+                            <p>Database insertion results will appear here.</p>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- RIGHT HAND LOG CENTER SIDEPANEL -->
+        <aside class="log-center-panel">
+            <div class="log-panel-header">
+                <h3><i class="fa-solid fa-terminal"></i> Process Log Center</h3>
+                <button class="btn-icon" onclick="window.SidePanelLog.clear()" title="Clear Logs"><i class="fa-solid fa-trash-can"></i></button>
+            </div>
+            <div id="logCenterList" class="log-center-list">
+                <!-- Log entries auto-inserted here -->
+            </div>
+        </aside>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../common/ui/api_key_modal.js"></script>
+    <script src="../common/ui/sidepanel.js"></script>
+    <script src="./stage_1/stage1_claims_ingestion.js"></script>
+    <script src="./stage_2/stage2_policy_checker.js"></script>
+    <script src="./stage_3/stage3_gl_mapper.js"></script>
+    <script src="./stage_4/stage4_db.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

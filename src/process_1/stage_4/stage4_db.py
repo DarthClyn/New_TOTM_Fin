@@ -3,6 +3,10 @@ Stage 4: SQL Database Commit & SQLAlchemy ORM Integration Module
 Integrates database.py, models.py, and schemas.py to store audited supplier invoices in local_sql_accounting.db.
 """
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../common/services')))
+
 from datetime import datetime
 from database import engine, SessionLocal, Base
 from models import InvoiceAuditRecord

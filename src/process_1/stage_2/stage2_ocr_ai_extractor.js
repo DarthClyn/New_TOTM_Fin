@@ -103,7 +103,7 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
             return;
         }
 
-        const activeApiKey = apiKey || localStorage.getItem('docu_openrouter_key') || '';
+        const activeApiKey = apiKey || localStorage.getItem('openRouterApiKey') || '';
 
         if (!activeApiKey) {
             document.getElementById('configModal').classList.remove('hidden');

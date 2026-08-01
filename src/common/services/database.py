@@ -10,7 +10,8 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 # 1. SQLite Connection String (stores DB in local file 'local_sql_accounting.db')
 # Configurable via DATABASE_URL environment variable for production PostgreSQL / MSSQL
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./local_sql_accounting.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "local_sql_accounting.db")
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 
 # 2. Create Engine (connect_args={"check_same_thread": False} required for SQLite multi-threading)
 engine = create_engine(
