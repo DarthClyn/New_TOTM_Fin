@@ -1,0 +1,12 @@
+==================================================
+DELIVERY ORDER
+==================================================
+DO Number: DO-2026-002
+Vendor: LA INDIA PRIVATE LIMITED
+Date Received: 2026-05-17
+
+Status: DELIVERED
+Remarks: 2 units received.
+[X] Technical inspection passed.
+Signed by: IT Admin
+==================================================

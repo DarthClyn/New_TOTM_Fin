@@ -1,0 +1,13 @@
+==================================================
+PURCHASE ORDER
+==================================================
+PO Number: PO-2026-002
+Vendor: LA INDIA PRIVATE LIMITED
+Date: 2026-05-10
+
+Approved Amount: 3150.00
+Currency: SGD
+
+Details:
+MacBook Pro M4 x 2 units
+Status: APPROVED BY IT DEPARTMENT

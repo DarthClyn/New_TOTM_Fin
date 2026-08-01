@@ -1,0 +1,13 @@
+==================================================
+CONTRACT AGREEMENT
+==================================================
+Agreement Ref: AGR-2026-001
+Vendor: AEROSPACE SYSTEMS LTD
+
+Type: Retainer & Parts Supply
+Monthly Fixed Retainer Amount: 500.00
+Variable Parts Fee: As per PO
+
+Status: ACTIVE CONTRACT
+Valid until: 2028-12-31
+==================================================

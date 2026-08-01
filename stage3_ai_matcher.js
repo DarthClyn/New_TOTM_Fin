@@ -1,0 +1,438 @@
+/**
+ * Stage 3: AI-Based Document Matcher Module
+ * Includes:
+ * - OCR Character Confusion Normalization (0 vs O, 1 vs I/l)
+ * - AI Re-Checker Step before flagging discrepancies
+ * - Stage 3 specific loader UI box inside Stage 3 panel
+ * - Human Review Modal Drawer & Inline Quick Action Shortcuts
+ * - Hides Approve/Reject/Review buttons once approved
+ * - Auto-triggers DB Commit in Stage 4 once all pending reviews are resolved
+ */
+
+window.Stage3AiMatcher = {
+    fixedModel: 'nvidia/nemotron-3-super-120b-a12b:free',
+    
+    systemPrompt: `You are an expert Enterprise Audit & Invoice Matching AI.
+Perform a strict 2-Way / 3-Way / 4-Way match between extracted Invoice Key-Values and Supporting Documents (Purchase Order, Delivery Order, Contract Agreement).
+
+STRICT VERIFICATION & OCR NORMALIZATION RULES:
+1. OCR AMBIGUITY NORMALIZATION: Common OCR character confusions MUST NOT be flagged as discrepancies. Automatically normalize:
+   - Digit '0' vs Letter 'O' / 'o' (e.g. DO-2026-001 vs D0-2026-001)
+   - Digit '1' vs Letter 'I' / 'i' / 'l' (e.g. I500 vs 1500)
+   - Currency symbol vs letter shapes (e.g. 'saD' or 'Sgd' vs 'SGD')
+   If the ONLY difference is an OCR character confusion, mark status as "MATCHED" with a note "OCR Auto-Corrected".
+2. SPELLING & VENDOR VERIFICATION: Check vendor names and line items for exact spelling matches.
+3. DECIMAL ACCURACY: Compare prices, subtotals, tax, and totals up to exact decimal precision.
+4. DO NOT OUTPUT ABSENT FIELDS: Only evaluate fields present in extracted invoice data or supporting documents.
+
+Output ONLY valid JSON:
+{
+  "overall_status": "MATCHED" | "DISCREPANCY_FOUND",
+  "match_summary": "Summary of audit results",
+  "match_results": [
+    {
+      "field_name": "Invoice Field Name",
+      "invoice_value": "Extracted Invoice Value",
+      "supporting_doc_source": "AGR.txt / PO.txt / DO.txt",
+      "supporting_doc_value": "Matched Value from Supporting Doc",
+      "status": "MATCHED" | "DISCREPANCY" | "PARTIAL_MATCH",
+      "verification_notes": "Detailed notes"
+    }
+  ]
+}`,
+
+    recheckerSystemPrompt: `You are an AI Re-Checker Inspector.
+Your job is to audit suspected discrepancies flagged during OCR invoice matching.
+Determine if the discrepancy is due to an OCR reading error or if it is a genuine business discrepancy.
+If it is an OCR reading error or character shape confusion (0 vs O, 1 vs I, etc.), correct status to MATCHED.
+CRITICAL NUMERICAL RULES:
+- DO NOT excuse or auto-correct numerical differences by assuming a missing decimal point, typo in digits, or rounding off.
+- ANY difference in monetary amounts, quantities, or prices must be kept as a DISCREPANCY, even if it is close or looks like a missing decimal. Numbers must be strictly accountable.
+Output valid JSON:
+{
+  "verified_status": "MATCHED" | "DISCREPANCY",
+  "recheck_notes": "Re-checker explanation"
+}`,
+
+    matchData: null,
+
+    async runAiMatch(apiKey) {
+        const stage2Data = window.Stage2OcrAiExtractor.extractedData;
+        const supportingDocsText = window.Stage1DocumentSelector.getCombinedContextText();
+
+        if (!stage2Data || Object.keys(stage2Data).length === 0) {
+            alert('Please run Stage 2 OCR & AI Extraction first.');
+            return;
+        }
+
+        const activeApiKey = apiKey || localStorage.getItem('docu_openrouter_key') || '';
+        if (!activeApiKey) {
+            document.getElementById('configModal').classList.remove('hidden');
+            window.SidePanelLog.log('p1 stage 3', 'doc matching failed: OpenRouter API key missing');
+            alert('Please enter your OpenRouter API Key in settings first.');
+            return;
+        }
+
+        window.SidePanelLog.log('p1 stage 3', 'doc matching with ai started');
+
+        const runMatchBtn = document.getElementById('runMatchBtn');
+        const stage3Loader = document.getElementById('stage3Loader');
+
+        if (runMatchBtn) runMatchBtn.disabled = true;
+        if (stage3Loader) stage3Loader.classList.remove('hidden');
+
+        const payloadText = `=== EXTRACTED INVOICE FIELDS ===\n${JSON.stringify(stage2Data, null, 2)}\n\n=== SUPPORTING DOCUMENTS ===\n${supportingDocsText}`;
+
+        try {
+            const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${activeApiKey}`,
+                    'HTTP-Referer': window.location.href,
+                    'X-Title': 'Finance Automation AI Stage 3',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: this.fixedModel,
+                    messages: [
+                        { role: 'system', content: this.systemPrompt },
+                        { role: 'user', content: payloadText }
+                    ],
+                    temperature: 0.1
+                })
+            });
+
+            if (!response.ok) {
+                let errorMsg = `HTTP ${response.status} Error`;
+                try {
+                    const errJson = await response.json();
+                    errorMsg = errJson.error?.message || errorMsg;
+                } catch (e) {}
+
+                if (response.status === 401 || response.status === 403) {
+                    document.getElementById('configModal').classList.remove('hidden');
+                    window.SidePanelLog.log('p1 stage 3', 'doc matching failed: API key expired or invalid (HTTP ' + response.status + ')');
+                    throw new Error('OpenRouter API Key is invalid or expired. Please update key in settings.');
+                } else {
+                    window.SidePanelLog.log('p1 stage 3', 'doc matching failed: ' + errorMsg);
+                    throw new Error(errorMsg);
+                }
+            }
+
+            const data = await response.json();
+            const content = data.choices[0].message.content;
+
+            await this.processRecheckerStep(content, activeApiKey);
+
+        } catch (err) {
+            console.error('Stage 3 AI Match Error:', err);
+            alert('AI Match Request Failed: ' + err.message);
+            throw err; // Stop the pipeline from continuing to Stage 4
+        } finally {
+            if (runMatchBtn) runMatchBtn.disabled = false;
+            if (stage3Loader) stage3Loader.classList.add('hidden');
+        }
+    },
+
+    async processRecheckerStep(rawContent, apiKey) {
+        let cleanJson = rawContent;
+        if (cleanJson.includes('```')) {
+            cleanJson = cleanJson.replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
+
+        try {
+            const parsed = JSON.parse(cleanJson);
+            const results = parsed.match_results || [];
+            const discrepancies = results.filter(r => r.status === 'DISCREPANCY');
+
+            if (discrepancies.length > 0) {
+                window.SidePanelLog.log('p1 stage 3', `AI re-checker inspecting ${discrepancies.length} discrepancy fields...`);
+
+                const stage3LoaderStatus = document.getElementById('stage3LoaderStatus');
+                if (stage3LoaderStatus) stage3LoaderStatus.textContent = 'AI Re-Checker inspecting suspected discrepancies...';
+
+                for (let row of discrepancies) {
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout
+                        
+                        const recheckRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                            method: 'POST',
+                            signal: controller.signal,
+                            headers: {
+                                'Authorization': `Bearer ${apiKey}`,
+                                'HTTP-Referer': window.location.href,
+                                'X-Title': 'Finance Automation AI Re-Checker',
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                model: this.fixedModel,
+                                messages: [
+                                    { role: 'system', content: this.recheckerSystemPrompt },
+                                    { role: 'user', content: `Inspect field '${row.field_name}': Invoice Value='${row.invoice_value}' vs Supporting Doc Value='${row.supporting_doc_value}'. Notes: ${row.verification_notes}` }
+                                ],
+                                temperature: 0.0
+                            })
+                        });
+                        clearTimeout(timeoutId);
+
+                        if (recheckRes.ok) {
+                            const recheckData = await recheckRes.json();
+                            const rcText = recheckData.choices[0].message.content.replace(/```json/gi, '').replace(/```/g, '').trim();
+                            const rcParsed = JSON.parse(rcText);
+
+                            if (rcParsed.verified_status === 'MATCHED') {
+                                row.status = 'MATCHED';
+                                row.verification_notes += ` | [AI Re-Checker Auto-Corrected: ${rcParsed.recheck_notes}]`;
+                                window.SidePanelLog.log('p1 stage 3', `AI re-checker cleared discrepancy for '${row.field_name}'`);
+                            }
+                        }
+                        
+                        // Add a small 1s delay to prevent hitting free-tier rate limits
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                    } catch (e) {
+                        console.warn('Re-checker sub-step skipped or timed out:', e);
+                        window.SidePanelLog.log('p1 stage 3', `Re-checker skipped for '${row.field_name}' due to timeout/error`);
+                    }
+                }
+            }
+
+            this.renderMatchTable(JSON.stringify(parsed));
+        } catch (e) {
+            console.error('Rechecker parse error:', e);
+            this.renderMatchTable(rawContent);
+        }
+    },
+
+    renderMatchTable(rawContent) {
+        let cleanJson = rawContent;
+        if (cleanJson.includes('```')) {
+            cleanJson = cleanJson.replace(/```json/gi, '').replace(/```/g, '').trim();
+        }
+
+        try {
+            const parsed = JSON.parse(cleanJson);
+            this.matchData = parsed;
+
+            const summaryBox = document.getElementById('matchSummaryBox');
+            const tableContainer = document.getElementById('matchTableContainer');
+
+            const rawResults = parsed.match_results || [];
+            const filteredResults = rawResults.filter(row => {
+                const status = (row.status || '').toUpperCase();
+                const invVal = row.invoice_value;
+                return (
+                    status !== 'NOT_AVAILABLE' &&
+                    status !== 'N/A' &&
+                    invVal !== null &&
+                    invVal !== undefined &&
+                    invVal !== 'null' &&
+                    invVal !== 'N/A'
+                );
+            });
+
+            const discrepanciesCount = filteredResults.filter(r => r.status === 'DISCREPANCY').length;
+            const isPassed = discrepanciesCount === 0;
+
+            summaryBox.className = `match-summary-banner ${isPassed ? 'status-pass' : 'status-fail'}`;
+            summaryBox.innerHTML = `
+                <div class="summary-status-icon">
+                    <i class="fa-solid ${isPassed ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i>
+                </div>
+                <div class="summary-details">
+                    <h4>${isPassed ? 'MATCH VERIFIED SUCCESSFUL' : 'MATCH DISCREPANCY DETECTED'}</h4>
+                    <p>${parsed.match_summary || 'Multi-way invoice document match completed.'}</p>
+                </div>
+            `;
+            summaryBox.classList.remove('hidden');
+
+            if (filteredResults.length === 0) {
+                tableContainer.innerHTML = '<div class="empty-state"><p>No relevant matching fields found.</p></div>';
+            } else {
+                let tableHtml = `
+                    <table class="match-data-table">
+                        <thead>
+                            <tr>
+                                <th>Invoice Field</th>
+                                <th>Invoice Extracted Value</th>
+                                <th>Supporting Doc Source</th>
+                                <th>Supporting Doc Value</th>
+                                <th>Match Status</th>
+                                <th>Verification Notes</th>
+                                <th>Human Review Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filteredResults.map((row, idx) => {
+                                let badgeClass = 'badge-match';
+                                if (row.status === 'DISCREPANCY') badgeClass = 'badge-discrepancy';
+                                else if (row.status === 'PARTIAL_MATCH') badgeClass = 'badge-partial';
+
+                                const isMatched = row.status === 'MATCHED';
+
+                                return `
+                                    <tr>
+                                        <td class="font-bold">${row.field_name || '-'}</td>
+                                        <td id="inv_val_${idx}">${typeof row.invoice_value === 'object' ? JSON.stringify(row.invoice_value) : (row.invoice_value ?? '-')}</td>
+                                        <td><span class="doc-tag">${row.supporting_doc_source || 'N/A'}</span></td>
+                                        <td>${typeof row.supporting_doc_value === 'object' ? JSON.stringify(row.supporting_doc_value) : (row.supporting_doc_value ?? '-')}</td>
+                                        <td><span class="badge ${badgeClass}" id="status_badge_${idx}">${row.status || 'MATCHED'}</span></td>
+                                        <td class="text-sm-notes">${row.verification_notes || '-'}</td>
+                                        <td id="action_cell_${idx}">
+                                            ${isMatched ? '<span class="text-verified"><i class="fa-solid fa-check"></i> Verified</span>' : `
+                                                <div class="action-shortcut-group">
+                                                    <button class="btn btn-xs btn-success" onclick="window.Stage3AiMatcher.quickApproveRow(${idx})" title="Quick Approve">
+                                                        <i class="fa-solid fa-check"></i>
+                                                    </button>
+                                                    <button class="btn btn-xs btn-danger" onclick="window.Stage3AiMatcher.quickRejectRow(${idx})" title="Quick Reject">
+                                                        <i class="fa-solid fa-xmark"></i>
+                                                    </button>
+                                                    <button class="btn btn-xs btn-outline" onclick="window.Stage3AiMatcher.openHumanReviewModal(${idx})" title="Detailed Review Drawer">
+                                                        <i class="fa-solid fa-eye"></i> View Review
+                                                    </button>
+                                                </div>
+                                            `}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+                tableContainer.innerHTML = tableHtml;
+            }
+
+            document.getElementById('emptyStage3State').classList.add('hidden');
+            tableContainer.classList.remove('hidden');
+
+            window.SidePanelLog.log('p1 stage 3', 'doc matching done');
+
+            if (isPassed) {
+                window.SidePanelLog.log('p1 stage 3', 'no discrepancy found');
+            } else {
+                window.SidePanelLog.log('p1 stage 3', `discrepancy found (${discrepanciesCount} items)`);
+            }
+
+        } catch (e) {
+            console.error('Failed to parse Stage 3 JSON:', e);
+            window.SidePanelLog.log('p1 stage 3', 'doc matching failed: JSON parse error');
+            alert('AI returned matching analysis in non-standard format.');
+        }
+    },
+
+    checkAutoCommitToDb() {
+        if (!window.Stage4Database.hasPendingReviews()) {
+            window.SidePanelLog.log('p1 stage 4', 'All field reviews resolved by auditor. Auto-committing invoice to SQL DB...');
+            window.Stage4Database.pushToDatabase(true);
+        }
+    },
+
+    quickApproveRow(index) {
+        if (!this.matchData || !this.matchData.match_results[index]) return;
+        const row = this.matchData.match_results[index];
+        row.status = 'MATCHED';
+        row.verification_notes += ' [Approved by Human Auditor]';
+
+        const badge = document.getElementById(`status_badge_${index}`);
+        if (badge) {
+            badge.className = 'badge badge-match';
+            badge.textContent = 'MATCHED';
+        }
+
+        const actionCell = document.getElementById(`action_cell_${index}`);
+        if (actionCell) {
+            actionCell.innerHTML = '<span class="text-verified"><i class="fa-solid fa-check"></i> Verified</span>';
+        }
+
+        window.SidePanelLog.log('human approval', `human approval approved for field '${row.field_name}'`);
+        
+        // CHECK IF ALL REVIEWS ARE NOW RESOLVED
+        this.checkAutoCommitToDb();
+    },
+
+    quickRejectRow(index) {
+        if (!this.matchData || !this.matchData.match_results[index]) return;
+        const row = this.matchData.match_results[index];
+        row.status = 'REJECTED';
+        row.verification_notes += ' [Rejected by Auditor]';
+
+        const badge = document.getElementById(`status_badge_${index}`);
+        if (badge) {
+            badge.className = 'badge badge-discrepancy';
+            badge.textContent = 'REJECTED';
+        }
+
+        window.SidePanelLog.log('human approval', `human approval rejected for field '${row.field_name}'`);
+
+        // CHECK IF ALL REVIEWS ARE NOW RESOLVED
+        this.checkAutoCommitToDb();
+    },
+
+    openHumanReviewModal(index) {
+        if (!this.matchData || !this.matchData.match_results[index]) return;
+
+        const row = this.matchData.match_results[index];
+        const modal = document.getElementById('humanReviewModal');
+        
+        document.getElementById('reviewFieldName').textContent = row.field_name;
+        document.getElementById('reviewInvoiceVal').value = typeof row.invoice_value === 'object' ? JSON.stringify(row.invoice_value) : (row.invoice_value ?? '');
+        document.getElementById('reviewDocSource').textContent = row.supporting_doc_source || 'Supporting Document';
+        document.getElementById('reviewDocVal').textContent = typeof row.supporting_doc_value === 'object' ? JSON.stringify(row.supporting_doc_value) : (row.supporting_doc_value ?? '');
+        document.getElementById('reviewNotesText').textContent = row.verification_notes || 'No notes available.';
+
+        modal.dataset.activeIndex = index;
+        modal.classList.remove('hidden');
+    },
+
+    approveFieldMatch() {
+        const modal = document.getElementById('humanReviewModal');
+        const index = modal.dataset.activeIndex;
+        if (index !== undefined && this.matchData.match_results[index]) {
+            this.quickApproveRow(index);
+            modal.classList.add('hidden');
+        }
+    },
+
+    quickRejectFieldMatch() {
+        const modal = document.getElementById('humanReviewModal');
+        const index = modal.dataset.activeIndex;
+        if (index !== undefined && this.matchData.match_results[index]) {
+            this.quickRejectRow(index);
+            modal.classList.add('hidden');
+        }
+    },
+
+    overrideFieldMatch() {
+        const modal = document.getElementById('humanReviewModal');
+        const index = modal.dataset.activeIndex;
+        const newInvoiceVal = document.getElementById('reviewInvoiceVal').value.trim();
+
+        if (index !== undefined && this.matchData.match_results[index]) {
+            const row = this.matchData.match_results[index];
+            row.invoice_value = newInvoiceVal;
+            row.status = 'MATCHED';
+            row.verification_notes += ` [Overridden & Approved by Auditor: ${newInvoiceVal}]`;
+
+            const badge = document.getElementById(`status_badge_${index}`);
+            if (badge) {
+                badge.className = 'badge badge-match';
+                badge.textContent = 'MATCHED';
+            }
+
+            const invValTd = document.getElementById(`inv_val_${index}`);
+            if (invValTd) invValTd.textContent = newInvoiceVal;
+
+            const actionCell = document.getElementById(`action_cell_${index}`);
+            if (actionCell) {
+                actionCell.innerHTML = '<span class="text-verified"><i class="fa-solid fa-check"></i> Verified</span>';
+            }
+
+            modal.classList.add('hidden');
+            window.SidePanelLog.log('human approval', `human approval overridden & approved for field '${row.field_name}' to '${newInvoiceVal}'`);
+
+            // CHECK IF ALL REVIEWS ARE NOW RESOLVED
+            this.checkAutoCommitToDb();
+        }
+    }
+};

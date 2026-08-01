@@ -1,0 +1,12 @@
+==================================================
+DELIVERY ORDER / SERVICE REPORT
+==================================================
+DO Number: DO-2026-001
+Vendor: AEROSPACE SYSTEMS LTD
+Date Received: 2026-05-10
+
+Status: DELIVERED
+Remarks: All parts received in good condition.
+[X] Technical inspection passed.
+Signed by: Warehouse Manager
+==================================================

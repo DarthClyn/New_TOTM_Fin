@@ -1,0 +1,13 @@
+==================================================
+PURCHASE ORDER
+==================================================
+PO Number: PO-2026-001
+Seller: AEROSPACE SYSTEMS LTD
+Date: 2026-05-01
+
+Approved Amount: 1600.00
+Currency: SGD
+
+Details:
+Aviation parts and maintenance fees as per Agreement AGR-2026-001.
+Status: APPROVED BY PROCUREMENT
