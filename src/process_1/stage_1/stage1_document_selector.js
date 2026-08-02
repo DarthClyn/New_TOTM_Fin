@@ -130,6 +130,57 @@ window.Stage1DocumentSelector = {
         this.renderCustomFiles();
     },
 
+    async handleOneDriveInvoice(odFile) {
+        if (!odFile) return;
+        window.SidePanelLog.log('p1 stage 1', `Downloading main invoice from OneDrive: ${odFile.name}`);
+        try {
+            const res = await fetch(odFile["@microsoft.graph.downloadUrl"]);
+            const blob = await res.blob();
+            const file = new File([blob], odFile.name, { type: blob.type || this.getMimeType(odFile.name) });
+            await this.handleFileSelect(file);
+        } catch (e) {
+            console.error("OneDrive Download Error", e);
+            window.SidePanelLog.log('p1 stage 1', `Failed to download OneDrive file: ${e.message}`);
+        }
+    },
+
+    async handleOneDriveSupportingDocs(odFiles) {
+        if (!odFiles || odFiles.length === 0) return;
+        
+        if (this.activeMode !== 'custom') {
+            this.setMode('custom');
+        }
+
+        window.SidePanelLog.log('p1 stage 1', `Downloading ${odFiles.length} supporting docs from OneDrive...`);
+        for (const odFile of odFiles) {
+            try {
+                const res = await fetch(odFile["@microsoft.graph.downloadUrl"]);
+                const text = await res.text();
+                const fileId = 'custom_od_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+                this.customFiles.push({
+                    id: fileId,
+                    name: odFile.name,
+                    content: text
+                });
+                window.SidePanelLog.log('p1 stage 1', `OneDrive supporting doc added: ${odFile.name}`);
+            } catch (e) {
+                console.error("OneDrive Download Error", e);
+                window.SidePanelLog.log('p1 stage 1', `Failed to download supporting doc ${odFile.name}`);
+            }
+        }
+        this.renderCustomFiles();
+    },
+
+    getMimeType(fileName) {
+        const ext = fileName.split('.').pop().toLowerCase();
+        if (ext === 'pdf') return 'application/pdf';
+        if (ext === 'png') return 'image/png';
+        if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+        if (ext === 'csv') return 'text/csv';
+        if (ext === 'txt') return 'text/plain';
+        return 'application/octet-stream';
+    },
+
     renderCustomFiles() {
         const grid = document.getElementById('scenarioDocsGrid');
         grid.innerHTML = '';

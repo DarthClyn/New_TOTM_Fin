@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Microsoft Authentication Callback</title>
+    <script>
+        // Monkey-patch to fix Microsoft OneDrive v7.2 SDK bug where it crashes on non-string postMessages
+        const originalAddEventListener = window.addEventListener;
+        window.addEventListener = function(type, listener, options) {
+            if (type === 'message') {
+                const wrappedListener = function(event) {
+                    try {
+                        return listener(event);
+                    } catch (e) {
+                        if (e instanceof TypeError && e.message.includes('indexOf')) {
+                            return; // Suppress OneDrive SDK crash
+                        }
+                        throw e;
+                    }
+                };
+                return originalAddEventListener.call(window, type, wrappedListener, options);
+            }
+            return originalAddEventListener.call(window, type, listener, options);
+        };
+    </script>
+    <script type="text/javascript" src="https://js.live.net/v7.2/OneDrive.js"></script>
+</head>
+<body>
+    <p>Authentication complete. You can close this window.</p>
+    <!-- OneDrive SDK handles closing this window automatically if opened via popup -->
+</body>
+</html>

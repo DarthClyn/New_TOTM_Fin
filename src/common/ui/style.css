@@ -493,6 +493,12 @@ body {
     height: 100%;
     opacity: 0;
     cursor: pointer;
+    z-index: 1;
+}
+
+.dropzone-content button, .custom-upload-prompt button {
+    position: relative;
+    z-index: 2;
 }
 
 .upload-icon-wrapper {

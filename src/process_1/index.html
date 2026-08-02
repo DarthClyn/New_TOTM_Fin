@@ -16,6 +16,29 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <!-- pdf.js CDN for PDF page rendering -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Monkey-patch to fix Microsoft OneDrive v7.2 SDK bug where it crashes on non-string postMessages
+        const originalAddEventListener = window.addEventListener;
+        window.addEventListener = function(type, listener, options) {
+            if (type === 'message') {
+                const wrappedListener = function(event) {
+                    try {
+                        // If it's the buggy OneDrive listener, it will crash here if event.data is an object
+                        return listener(event);
+                    } catch (e) {
+                        if (e instanceof TypeError && e.message.includes('indexOf')) {
+                            // Suppress OneDrive SDK crash
+                            return;
+                        }
+                        throw e;
+                    }
+                };
+                return originalAddEventListener.call(window, type, wrappedListener, options);
+            }
+            return originalAddEventListener.call(window, type, listener, options);
+        };
+    </script>
+    <script type="text/javascript" src="https://js.live.net/v7.2/OneDrive.js"></script>
     <link rel="stylesheet" href="../common/ui/style.css">
 </head>
 
@@ -85,10 +108,14 @@
                             <div class="custom-upload-prompt">
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
                                 <span>Upload Supporting Documents (.txt, .csv)</span>
-                                <button class="btn btn-primary btn-xs"
-                                    onclick="document.getElementById('customContextFileInput').click()">
-                                    <i class="fa-solid fa-plus"></i> Add Supporting Docs
-                                </button>
+                                <div style="display: flex; gap: 8px; justify-content: center; margin-top: 10px;">
+                                    <button class="btn btn-primary btn-xs" onclick="document.getElementById('customContextFileInput').click()">
+                                        <i class="fa-solid fa-folder-open"></i> Browse Local Files
+                                    </button>
+                                    <button class="btn btn-accent btn-xs" id="onedriveSupportingBtn">
+                                        <i class="fa-brands fa-microsoft"></i> Select from OneDrive
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -107,10 +134,14 @@
                                 </div>
                                 <h3>Select or Drop Main Invoice</h3>
                                 <p>Supports Images (PNG/JPG), PDFs (Text & Scanned), and Text (.txt, .csv)</p>
-                                <button class="btn btn-primary btn-sm"
-                                    onclick="document.getElementById('fileInput').click()">
-                                    <i class="fa-solid fa-folder-open"></i> Browse Custom Invoice
-                                </button>
+                                <div style="display: flex; gap: 8px; justify-content: center; margin-top: 16px;">
+                                    <button class="btn btn-primary btn-sm" onclick="document.getElementById('fileInput').click()">
+                                        <i class="fa-solid fa-folder-open"></i> Browse Local
+                                    </button>
+                                    <button class="btn btn-accent btn-sm" id="onedriveInvoiceBtn">
+                                        <i class="fa-brands fa-microsoft"></i> OneDrive
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -346,6 +377,7 @@
     <!-- Scripts -->
     <script src="../common/ui/api_key_modal.js"></script>
     <script src="./stage_1/stage1_document_selector.js"></script>
+    <script src="onedrive_service.js"></script>
     <script src="./stage_2/stage2_ocr_ai_extractor.js"></script>
     <script src="./stage_3/stage3_ai_matcher.js"></script>
     <script src="./stage_4/stage4_db.js"></script>
