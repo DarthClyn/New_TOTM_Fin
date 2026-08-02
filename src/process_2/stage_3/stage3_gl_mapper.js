@@ -620,7 +620,10 @@ Example: { "ENTERT": "78050200", "MEAL": "78050200", "UNKNOWN": "MANUAL" }`,
         `;
 
         groups.forEach(group => {
-            const glCode = mappings[group.code] || 'MANUAL';
+            let glCode = mappings[group.code] || 'MANUAL';
+            if (glCode !== 'MANUAL' && !this.glDictionary[glCode]) {
+                glCode = 'MANUAL';
+            }
             const isManual = glCode === 'MANUAL';
             const badgeClass = isManual ? 'badge-discrepancy' : 'badge-match';
             const isKnown = !!knownCodes[group.code];
