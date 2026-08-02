@@ -118,7 +118,26 @@ window.Stage1DocumentSelector = {
     async handleCustomContextFilesUpload(filesList) {
         const filesArray = Array.from(filesList);
         for (const file of filesArray) {
-            const text = await file.text();
+            let text = '';
+            if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+                try {
+                    const fileArrayBuffer = await file.arrayBuffer();
+                    const pdf = await window.pdfjsLib.getDocument({ data: fileArrayBuffer }).promise;
+                    let fullText = '';
+                    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                        const page = await pdf.getPage(pageNum);
+                        const content = await page.getTextContent();
+                        fullText += content.items.map(item => item.str).join(' ') + '\n';
+                    }
+                    text = fullText;
+                } catch(e) {
+                    console.error("PDF extraction failed", e);
+                    text = await file.text();
+                }
+            } else {
+                text = await file.text();
+            }
+            
             const fileId = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
             this.customFiles.push({
                 id: fileId,

@@ -136,8 +136,10 @@ Output valid JSON:
 
     async processRecheckerStep(rawContent, apiKey) {
         let cleanJson = rawContent;
-        if (cleanJson.includes('```')) {
-            cleanJson = cleanJson.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const firstBrace = cleanJson.indexOf('{');
+        const lastBrace = cleanJson.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+            cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
         }
 
         try {
@@ -207,8 +209,10 @@ Output valid JSON:
 
     renderMatchTable(rawContent) {
         let cleanJson = rawContent;
-        if (cleanJson.includes('```')) {
-            cleanJson = cleanJson.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const firstBrace = cleanJson.indexOf('{');
+        const lastBrace = cleanJson.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+            cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
         }
 
         try {
