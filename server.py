@@ -193,5 +193,5 @@ def run(port=3000):
         print("\nServer stopped.")
 
 if __name__ == '__main__':
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else int(os.getenv("PORT", 3000))
     run(port)
