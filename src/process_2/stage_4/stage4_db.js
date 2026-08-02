@@ -47,13 +47,14 @@ window.Stage4Database = {
             }
 
             const newRecordPayload = {
-                ref_no: claim.refNo,
+                ref_no: claim.refNo.split('-')[0],
                 gl_code: glCode,
                 group_name: claim.groupName,
                 receipt_no: claim.receiptNo,
                 receipt_date: claim.receiptDate,
                 claimable_amt: parseFloat(claim.claimAmt),
                 hod_approval: claim.hodApproval,
+                employee_name: claim.employeeName || 'Unknown',
                 status: 'SQL_RECORD_INSERTED'
             };
 
@@ -64,6 +65,7 @@ window.Stage4Database = {
                     body: JSON.stringify(newRecordPayload)
                 });
                 if (response.ok) pushedCount++;
+                else throw new Error(`HTTP ${response.status}`);
             } catch (e) {
                 console.warn('API POST failed, fallback to localStorage:', e);
                 const records = JSON.parse(localStorage.getItem(this.dbKey) || '[]');
@@ -142,6 +144,42 @@ window.Stage4Database = {
         `;
 
         tableContainer.innerHTML = html;
+    },
+
+    async exportToCSV() {
+        let records = [];
+        try {
+            const response = await fetch(this.apiEndpoint);
+            if (response.ok) records = await response.json();
+        } catch (e) {
+            records = JSON.parse(localStorage.getItem(this.dbKey) || '[]');
+        }
+
+        if (records.length === 0) {
+            alert("No records in database to export!");
+            return;
+        }
+
+        // A.5 Format: Post Date, Tax Date, Ref 1, Description, Description 2, Account Code, Account Description, Local DR, Local CR
+        let csv = "Post Date,Tax Date,Ref 1,Description,Description 2,Account Code,Account Description,Local DR,Local CR\n";
+        
+        records.forEach(r => {
+            const empName = r.employee_name || "UNKNOWN EMPLOYEE";
+            const desc2 = `"${r.group_name} - ${r.claimable_amt}"`;
+            const acctDesc = window.Stage3GLMapper.glDictionary[r.gl_code] || 'UNKNOWN';
+            
+            csv += `30-06-2026,30-06-2026,${r.ref_no},${empName},${desc2},${r.gl_code},${acctDesc},${r.claimable_amt},0\n`;
+        });
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('href', url);
+        a.setAttribute('download', 'GL_Export.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.SidePanelLog.log('p2 stage 4', 'Exported GL records to CSV.');
     }
 };
 

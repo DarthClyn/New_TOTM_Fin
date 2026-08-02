@@ -37,5 +37,6 @@ class EmployeeClaimRecord(Base):
     receipt_date = Column(String(50), nullable=True)
     claimable_amt = Column(Float, nullable=False)
     hod_approval = Column(String(50), nullable=False)
+    employee_name = Column(String(200), nullable=True)
     status = Column(String(50), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)

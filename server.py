@@ -134,6 +134,7 @@ class CustomFinanceHandler(SimpleHTTPRequestHandler):
                     receipt_date=validated.receipt_date,
                     claimable_amt=validated.claimable_amt,
                     hod_approval=validated.hod_approval,
+                    employee_name=validated.employee_name,
                     status=validated.status
                 )
                 db.add(record)

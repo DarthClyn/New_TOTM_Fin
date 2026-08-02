@@ -42,6 +42,10 @@
                     <div class="card p-4">
                         <div style="margin-bottom: 24px;">
                             <h3 class="text-lg font-bold" style="margin-bottom: 12px;">Ingested Claims Table</h3>
+                            <button class="btn btn-outline" onclick="document.getElementById('claimsUpload').click()" style="margin-right: 8px;">
+                                <i class="fa-solid fa-file-csv"></i> Upload Claims CSV
+                            </button>
+                            <input type="file" id="claimsUpload" accept=".csv" style="display: none;">
                             <button class="btn btn-primary" id="saveClaimsBtn">
                                 <i class="fa-solid fa-save"></i> Save Changes
                             </button>
@@ -72,8 +76,16 @@
                                 </button>
                             </div>
                         </div>
-                        <textarea id="policyText" class="form-input" style="width: 100%; height: 80px; font-family: inherit; margin-top: 16px; margin-bottom: 16px;">HOD approval is required; automatically reject if not approved.
-Claim amount must be under 50,000 SGD.</textarea>
+                        <textarea id="policyText" class="form-input" style="width: 100%; height: 180px; font-family: inherit; margin-top: 16px; margin-bottom: 16px;">STAFF CLAIM POLICY RULES (A.6):
+1. HOD pre-approval is strictly required. Reject if 'Pending' or 'Not Approved'.
+2. Meals: Lunch is capped at S$25, Dinner is capped at S$50.
+3. Mobile Phone: Clerical not eligible. M2-M5 capped at S$50. M5-M6 capped at S$100. M7 capped at S$150. M8-M9 capped at S$180. (Assume Alice is M2-M5, cap 50).
+4. Dental: Capped at S$300 per annum.
+5. Accommodation: Max 4-star business hotel, capped at S$350 per night.
+6. Flights: Economy class only unless pre-approved.
+7. Non-allowable: Alcohol, pay-per-view movies, personal toiletries are strictly rejected. However, drinks and snacks bought at convenience stores (instead of hotel mini-bars) or for office pantry are ALLOWED.
+8. IT/Office Supplies: Allowed if pre-approved and valid receipts provided.
+Check the claim details against these limits.</textarea>
                     </div>
 
                     <!-- RUN ALL STAGES (Added back per request) -->
@@ -108,6 +120,7 @@ Claim amount must be under 50,000 SGD.</textarea>
                         <div style="display: flex; align-items: center; gap: 12px;">
                             <h2><i class="fa-solid fa-sitemap"></i> 3. GL Code Mapping</h2>
                             <span class="badge" id="stage3Status">Pending</span>
+                            <span class="badge badge-accent" id="targetSystemBadge" style="display:none;"></span>
                         </div>
                         <button class="btn btn-primary" id="runStage3Btn">
                             <i class="fa-solid fa-play"></i> Run GL Mapping
@@ -127,9 +140,14 @@ Claim amount must be under 50,000 SGD.</textarea>
                             <h2><i class="fa-solid fa-database"></i> 4. Database Push</h2>
                             <span class="badge" id="stage4Status">Pending</span>
                         </div>
-                        <button class="btn btn-success" id="runStage4Btn">
-                            <i class="fa-solid fa-play"></i> Push to SQL DB
-                        </button>
+                        <div>
+                            <button class="btn btn-outline" onclick="window.Stage4Database.exportToCSV()" style="margin-right: 8px;">
+                                <i class="fa-solid fa-download"></i> Export GL CSV
+                            </button>
+                            <button class="btn btn-success" id="runStage4Btn">
+                                <i class="fa-solid fa-play"></i> Push to SQL DB
+                            </button>
+                        </div>
                     </div>
                     <div class="card p-4" id="stage4Content">
                         <div class="empty-state">

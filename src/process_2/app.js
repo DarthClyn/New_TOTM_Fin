@@ -76,6 +76,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // CSV File Upload binding
+    const claimsUpload = document.getElementById('claimsUpload');
+    if (claimsUpload) {
+        claimsUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            window.SidePanelLog.log('p2 stage 1', `Reading claims CSV file: ${file.name}...`);
+
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const content = evt.target.result;
+                if (window.Stage1ClaimsIngestion && window.Stage1ClaimsIngestion.parseCSV) {
+                    window.Stage1ClaimsIngestion.parseCSV(content);
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
+
 
     // STATE Variables to pass between stages
     let aiDecisionsState = null;

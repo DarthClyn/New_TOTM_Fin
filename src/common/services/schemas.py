@@ -35,6 +35,7 @@ class EmployeeClaimRecordCreate(BaseModel):
     receipt_date: Optional[str] = None
     claimable_amt: float
     hod_approval: str
+    employee_name: Optional[str] = None
     status: str
 
 class EmployeeClaimRecordResponse(EmployeeClaimRecordCreate):
