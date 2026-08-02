@@ -5,7 +5,10 @@ Defines database tables as Python classes inheriting from Base.
 
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, DateTime
-from database import Base
+try:
+    from .database import Base
+except ImportError:
+    from database import Base
 
 class InvoiceAuditRecord(Base):
     __tablename__ = "supplier_invoices"

@@ -4,75 +4,98 @@
  */
 
 window.Stage4Database = {
+    apiEndpoint: '/api/p2/records',
     dbKey: 'local_sql_claims_db',
 
     init() {
-        if (!localStorage.getItem(this.dbKey)) {
+        this.renderDatabaseViewer();
+    },
+
+    async clearDatabaseRecords() {
+        try {
+            await fetch(this.apiEndpoint, { method: 'DELETE' });
+            window.SidePanelLog.log('p2 stage 4', 'SQL database table cleared in SQLite.');
+        } catch (e) {
+            console.warn('API clear failed, falling back to localStorage:', e);
             localStorage.setItem(this.dbKey, JSON.stringify([]));
         }
         this.renderDatabaseViewer();
     },
 
-    clearDatabaseRecords() {
-        localStorage.setItem(this.dbKey, JSON.stringify([]));
-        window.SidePanelLog.log('p2 stage 4', 'SQL database table cleared by user.');
-        this.renderDatabaseViewer();
-    },
-
-    pushToDatabase(claims, aiDecisions, glMappings) {
+    async pushToDatabase(claims, aiDecisions, glMappings) {
         if (!claims || !aiDecisions || !glMappings) {
             window.SidePanelLog.log('p2 stage 4', 'Missing data. Cannot push to DB.');
             return false;
         }
 
-        const records = JSON.parse(localStorage.getItem(this.dbKey) || '[]');
-        let nextId = records.length > 0 ? Math.max(...records.map(r => r.id)) + 1 : 1;
         let pushedCount = 0;
 
-        claims.forEach(claim => {
+        for (const claim of claims) {
             const decision = aiDecisions.find(d => d.refNo === claim.refNo)?.decision;
             
             // Strict gate: Only push Approved claims
             if (decision !== 'Approved') {
                 window.SidePanelLog.log('p2 stage 4', `Skipping ${claim.refNo} (Status: ${decision}).`);
-                return; 
+                continue; 
             }
 
             const glCode = glMappings[claim.groupCode] || 'UNMAPPED';
             
             if (glCode === 'MANUAL') {
                 window.SidePanelLog.log('p2 stage 4', `Skipping ${claim.refNo} due to missing GL mapping.`);
-                return;
+                continue;
             }
 
-            const newRecord = {
-                id: nextId++,
+            const newRecordPayload = {
                 ref_no: claim.refNo,
                 gl_code: glCode,
                 group_name: claim.groupName,
                 receipt_no: claim.receiptNo,
                 receipt_date: claim.receiptDate,
-                claimable_amt: claim.claimAmt,
+                claimable_amt: parseFloat(claim.claimAmt),
                 hod_approval: claim.hodApproval,
                 status: 'SQL_RECORD_INSERTED'
             };
 
-            records.unshift(newRecord);
-            pushedCount++;
-        });
-
-        localStorage.setItem(this.dbKey, JSON.stringify(records));
+            try {
+                const response = await fetch(this.apiEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newRecordPayload)
+                });
+                if (response.ok) pushedCount++;
+            } catch (e) {
+                console.warn('API POST failed, fallback to localStorage:', e);
+                const records = JSON.parse(localStorage.getItem(this.dbKey) || '[]');
+                const nextId = records.length > 0 ? Math.max(...records.map(r => r.id)) + 1 : 1;
+                records.unshift({ id: nextId, ...newRecordPayload });
+                localStorage.setItem(this.dbKey, JSON.stringify(records));
+                pushedCount++;
+            }
+        }
 
         window.SidePanelLog.log('p2 stage 4', `Successfully pushed ${pushedCount} approved claims to SQL database.`);
         this.renderDatabaseViewer();
         return true;
     },
 
-    renderDatabaseViewer() {
+    async renderDatabaseViewer() {
         const tableContainer = document.getElementById('stage4Content');
         if (!tableContainer) return;
 
-        const records = JSON.parse(localStorage.getItem(this.dbKey) || '[]');
+        let records = [];
+        try {
+            const response = await fetch(this.apiEndpoint);
+            if (response.ok) {
+                records = await response.json();
+            } else {
+                throw new Error(`HTTP ${response.status}`);
+            }
+        } catch (e) {
+            console.warn('API fetch failed, reading localStorage fallback:', e);
+            records = JSON.parse(localStorage.getItem(this.dbKey) || '[]');
+        }
+
         records.sort((a, b) => b.id - a.id);
 
         if (records.length === 0) {
@@ -110,7 +133,7 @@ window.Stage4Database = {
                             <td>${r.group_name}</td>
                             <td class="font-mono">${r.receipt_no}</td>
                             <td class="font-mono">${r.receipt_date}</td>
-                            <td class="font-mono">${r.claimable_amt}</td>
+                            <td class="font-mono">${typeof r.claimable_amt === 'number' ? r.claimable_amt.toFixed(2) : r.claimable_amt}</td>
                             <td><span class="badge badge-match">${r.status}</span></td>
                         </tr>
                     `).join('')}
