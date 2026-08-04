@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOTM Finance Automation - Process: Group Consolidation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../common/ui/style.css">
+    <style>
+        .upload-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .upload-card {
+            background: var(--bg-panel);
+            border: 1px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .upload-card:hover {
+            border-color: var(--accent-blue);
+        }
+        .upload-card h3 { margin-bottom: 12px; font-size: 1.1rem; }
+        .upload-card i { font-size: 2.5rem; color: var(--text-muted); margin-bottom: 16px; }
+        .upload-card.has-file i { color: var(--accent-blue); }
+        .file-info { font-size: 0.85rem; color: var(--text-muted); margin-top: 12px; word-break: break-all; }
+        
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+        .results-table th, .results-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        .results-table th { background: var(--bg-surface); font-weight: 600; }
+        .results-table tbody tr:hover { background: var(--bg-surface); }
+    </style>
+</head>
+
+<body>
+    <div class="app-layout-wrapper">
+        <div class="app-container" style="max-width: 1200px; margin: 0 auto; width: 100%;">
+            <header class="app-header">
+                <div class="logo-container">
+                    <div class="logo-icon">
+                        <i class="fa-solid fa-sitemap"></i>
+                    </div>
+                    <div class="logo-text">
+                        <h1>Finance Automation <span>AI</span></h1>
+                        <p>Process: Group Financial Consolidation</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <a href="../../index.html" class="btn btn-secondary" style="text-decoration: none;">
+                        <i class="fa-solid fa-home"></i> Home
+                    </a>
+                </div>
+            </header>
+
+            <main class="main-workspace-vertical">
+                <!-- Data Upload Section -->
+                <section class="panel-full stage-panel">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-file-excel"></i> 1. Input Trial Balances (.xlsx)</h2>
+                    </div>
+                    
+                    <div class="upload-grid">
+                        <div class="upload-card" id="uploadCardSG">
+                            <i class="fa-solid fa-file-invoice"></i>
+                            <h3>SG Entity (SQL/SAP)</h3>
+                            <input type="file" id="fileSG" accept=".xlsx" class="file-input" style="display: none;">
+                            <button class="btn btn-outline btn-sm" onclick="document.getElementById('fileSG').click()">Select Excel</button>
+                            <div class="file-info" id="infoSG">No file selected</div>
+                        </div>
+                        
+                        <div class="upload-card" id="uploadCardIN">
+                            <i class="fa-solid fa-file-invoice"></i>
+                            <h3>India Entity</h3>
+                            <input type="file" id="fileIN" accept=".xlsx" class="file-input" style="display: none;">
+                            <button class="btn btn-outline btn-sm" onclick="document.getElementById('fileIN').click()">Select Excel</button>
+                            <div class="file-info" id="infoIN">No file selected</div>
+                        </div>
+                        
+                        <div class="upload-card" id="uploadCardID">
+                            <i class="fa-solid fa-file-invoice"></i>
+                            <h3>Indonesia Entity</h3>
+                            <input type="file" id="fileID" accept=".xlsx" class="file-input" style="display: none;">
+                            <button class="btn btn-outline btn-sm" onclick="document.getElementById('fileID').click()">Select Excel</button>
+                            <div class="file-info" id="infoID">No file selected</div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Processing Actions -->
+                <section class="panel-full stage-panel">
+                    <div class="panel-header">
+                        <h2><i class="fa-solid fa-gears"></i> 2. Consolidation Pipeline</h2>
+                    </div>
+                    
+                    <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+                        <button id="btnStage1" class="btn btn-primary" style="flex: 1;">
+                            <i class="fa-solid fa-table"></i> Stage 1: Pandas Normalization & Dict Mapping
+                        </button>
+                        <button id="btnStage2" class="btn btn-accent" style="flex: 1;" disabled>
+                            <i class="fa-solid fa-brain"></i> Stage 2: AI Semantic Mapping & Final Output
+                        </button>
+                    </div>
+                    
+                    <div id="loaderBox" class="loader-box hidden" style="margin-bottom: 16px;">
+                        <div class="loader-spinner-bar">
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span id="loaderStatus">Processing data...</span>
+                        </div>
+                    </div>
+
+                    <div id="resultsContainer" class="hidden">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                            <h3 id="resultsTitle"><i class="fa-solid fa-check-circle" style="color: var(--accent-green);"></i> Stage Complete</h3>
+                            <button id="downloadBtn" class="btn btn-success hidden">
+                                <i class="fa-solid fa-download"></i> Download Consolidation Excel
+                            </button>
+                        </div>
+                        <div id="rawContainers" class="hidden" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 20px;">
+                            <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; max-height: 500px; overflow-y: auto;">
+                                <h4 style="margin-bottom: 12px; font-size: 0.95rem;">SG Extracted COA</h4>
+                                <table class="results-table" id="sgRawTable">
+                                    <thead><tr id="sgRawTableHead"></tr></thead>
+                                    <tbody id="sgRawTableBody"></tbody>
+                                </table>
+                            </div>
+                            <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; max-height: 500px; overflow-y: auto;">
+                                <h4 style="margin-bottom: 12px; font-size: 0.95rem;">India Extracted Names</h4>
+                                <table class="results-table" id="inRawTable">
+                                    <thead><tr id="inRawTableHead"></tr></thead>
+                                    <tbody id="inRawTableBody"></tbody>
+                                </table>
+                            </div>
+                            <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; max-height: 500px; overflow-y: auto;">
+                                <h4 style="margin-bottom: 12px; font-size: 0.95rem;">Indonesia Extracted COA</h4>
+                                <table class="results-table" id="idRawTable">
+                                    <thead><tr id="idRawTableHead"></tr></thead>
+                                    <tbody id="idRawTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div id="mappingContainers" class="hidden" style="display: flex; gap: 20px; flex-direction: column; margin-bottom: 20px;">
+                            <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; max-height: 500px; overflow-y: auto;">
+                                <h4 style="margin-bottom: 12px;">India ↔ SG Mapping</h4>
+                                <table class="results-table" id="indiaTable">
+                                    <thead><tr id="indiaTableHead"></tr></thead>
+                                    <tbody id="indiaTableBody"></tbody>
+                                </table>
+                            </div>
+                            <div style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; max-height: 500px; overflow-y: auto;">
+                                <h4 style="margin-bottom: 12px;">Indonesia ↔ SG Mapping</h4>
+                                <table class="results-table" id="indoTable">
+                                    <thead><tr id="indoTableHead"></tr></thead>
+                                    <tbody id="indoTableBody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

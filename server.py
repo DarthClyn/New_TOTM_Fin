@@ -13,6 +13,12 @@ SERVICES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "src", "
 if SERVICES_DIR not in sys.path:
     sys.path.insert(0, SERVICES_DIR)
 
+import base64
+try:
+    from src.common.services.consolidation_service import ConsolidationEngine
+except ImportError:
+    from consolidation_service import ConsolidationEngine
+
 try:
     from src.common.services.database import engine, SessionLocal, Base
     from src.common.services.models import InvoiceAuditRecord, EmployeeClaimRecord
@@ -147,6 +153,39 @@ class CustomFinanceHandler(SimpleHTTPRequestHandler):
                 self.send_json_response({"error": str(e)}, status_code=400)
             finally:
                 db.close()
+            return
+
+        elif path == '/api/p3/consolidate':
+            try:
+                stage = payload.get('stage', 1)
+                files = payload.get('files', {})
+                sg_b64 = files.get('sg')
+                in_b64 = files.get('in')
+                id_b64 = files.get('id')
+                
+                if not all([sg_b64, in_b64, id_b64]):
+                    self.send_json_response({"error": "Missing one or more Excel files"}, status_code=400)
+                    return
+                
+                sg_bytes = base64.b64decode(sg_b64)
+                in_bytes = base64.b64decode(in_b64)
+                id_bytes = base64.b64decode(id_b64)
+                
+                engine = ConsolidationEngine()
+                result = engine.process(sg_bytes, in_bytes, id_bytes, stage)
+                
+                self.send_json_response({
+                    "status": "success",
+                    "excel_base64": result.get("excel_base64"),
+                    "preview_data": result.get("preview_data"),
+                    "india_mapping": result.get("india_mapping", []),
+                    "indo_mapping": result.get("indo_mapping", []),
+                    "sg_raw": result.get("sg_raw", []),
+                    "in_raw": result.get("in_raw", []),
+                    "id_raw": result.get("id_raw", [])
+                })
+            except Exception as e:
+                self.send_json_response({"error": str(e)}, status_code=500)
             return
 
         self.send_json_response({"error": "Not Found"}, status_code=404)
