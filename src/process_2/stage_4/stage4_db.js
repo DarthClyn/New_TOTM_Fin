@@ -31,7 +31,8 @@ window.Stage4Database = {
         let pushedCount = 0;
 
         for (const claim of claims) {
-            const decision = aiDecisions.find(d => d.refNo === claim.refNo)?.decision;
+            const aiObj = aiDecisions.find(d => d.refNo === claim.refNo) || {};
+            const decision = aiObj.decision;
             
             // Strict gate: Only push Approved claims
             if (decision !== 'Approved') {
@@ -39,7 +40,7 @@ window.Stage4Database = {
                 continue; 
             }
 
-            const glCode = glMappings[claim.groupCode] || 'UNMAPPED';
+            const glCode = glMappings[claim.groupCode] || glMappings[claim.groupName] || 'UNMAPPED';
             
             if (glCode === 'MANUAL') {
                 window.SidePanelLog.log('p2 stage 4', `Skipping ${claim.refNo} due to missing GL mapping.`);
@@ -47,14 +48,24 @@ window.Stage4Database = {
             }
 
             const newRecordPayload = {
-                ref_no: claim.refNo.split('-')[0],
+                ref_no: claim.refNo,
+                employee_code: window.Stage1ClaimsIngestion.employeeCode || claim.employeeCode || 'EMP-001',
+                employee_name: window.Stage1ClaimsIngestion.employeeName || claim.employeeName || 'ALICE',
+                submit_date: claim.submitDate || '',
+                approved_date: claim.approvedDate || '',
+                group_code: claim.groupCode || '',
+                group_name: claim.groupName || '',
+                template_name: claim.templateName || '',
+                receipt_no: claim.receiptNo || 'Receipt Attached',
+                receipt_date: claim.receiptDate || '',
+                approver: claim.approver || '',
+                gst: parseFloat(claim.gst || 0),
+                claimable_amt: parseFloat(claim.claimAmt || 0),
+                hod_approval: claim.hodApproval || 'Approved',
+                policy_decision: decision || 'Approved',
+                reasoning: aiObj.reasoning || '',
                 gl_code: glCode,
-                group_name: claim.groupName,
-                receipt_no: claim.receiptNo,
-                receipt_date: claim.receiptDate,
-                claimable_amt: parseFloat(claim.claimAmt),
-                hod_approval: claim.hodApproval,
-                employee_name: claim.employeeName || 'Unknown',
+                target_system: window.targetAccountingSystem || 'SAP',
                 status: 'SQL_RECORD_INSERTED'
             };
 
@@ -116,14 +127,20 @@ window.Stage4Database = {
             <table class="sql-db-table">
                 <thead>
                     <tr>
-                        <th>id</th>
-                        <th>ref_no</th>
-                        <th>gl_code</th>
-                        <th>group_name</th>
-                        <th>receipt_no</th>
-                        <th>receipt_date</th>
-                        <th>claimable_amt</th>
-                        <th>status</th>
+                        <th>ID</th>
+                        <th>Claim Ref No</th>
+                        <th>Emp Code</th>
+                        <th>Emp Name</th>
+                        <th>Submit Date</th>
+                        <th>Approved Date</th>
+                        <th>Group Name</th>
+                        <th>Comments</th>
+                        <th>Approver</th>
+                        <th>GST ($)</th>
+                        <th>Claimable ($)</th>
+                        <th>GL Code</th>
+                        <th>Target System</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -131,11 +148,17 @@ window.Stage4Database = {
                         <tr>
                             <td class="font-mono text-muted">${r.id}</td>
                             <td class="font-bold">${r.ref_no}</td>
-                            <td><span class="badge badge-accent">${r.gl_code}</span></td>
+                            <td>${r.employee_code || 'EMP-001'}</td>
+                            <td>${r.employee_name || 'ALICE'}</td>
+                            <td class="font-mono">${r.submit_date || ''}</td>
+                            <td class="font-mono">${r.approved_date || ''}</td>
                             <td>${r.group_name}</td>
-                            <td class="font-mono">${r.receipt_no}</td>
-                            <td class="font-mono">${r.receipt_date}</td>
-                            <td class="font-mono">${typeof r.claimable_amt === 'number' ? r.claimable_amt.toFixed(2) : r.claimable_amt}</td>
+                            <td class="text-muted" style="max-width: 180px; font-size: 0.85em;">${r.template_name || ''}</td>
+                            <td>${r.approver || ''}</td>
+                            <td class="font-mono">$${typeof r.gst === 'number' ? r.gst.toFixed(2) : (r.gst || '0.00')}</td>
+                            <td class="font-mono text-verified">$${typeof r.claimable_amt === 'number' ? r.claimable_amt.toFixed(2) : r.claimable_amt}</td>
+                            <td><span class="badge badge-accent">${r.gl_code}</span></td>
+                            <td><span class="badge badge-partial">${r.target_system || 'SAP'}</span></td>
                             <td><span class="badge badge-match">${r.status}</span></td>
                         </tr>
                     `).join('')}

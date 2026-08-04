@@ -5,28 +5,37 @@
  */
 
 window.Stage2PolicyChecker = {
-    systemPrompt: `You are an AI Finance Policy & Receipt Auditor.
+    systemPrompt: `You are an AI Finance Policy & Report Auditor.
 Your job is to:
 1. Cross-reference employee claims against uploaded receipt documents (2-Way Receipt Match).
 2. Evaluate claim details and receipt findings against corporate policy.
+3. Verify whether Sub Total and Grand Total match the mathematical sum of all claim items.
 
-Required JSON Output Array Format:
-[
-  {
-    "refNo": "CLAIM_REF_NO",
-    "receiptMatchStatus": "MATCH" | "AMOUNT_MISMATCH" | "DATE_MISMATCH" | "NO_RECEIPT",
-    "extractedReceiptAmt": "80.00",
-    "extractedReceiptNo": "inv1234",
-    "extractedReceiptDate": "03-07-2024",
-    "decision": "Approved" | "Rejected" | "Unclear",
-    "reasoning": "Brief explanation covering 2-way receipt match result and policy rule compliance"
+Required JSON Output Object Format:
+{
+  "claimsAudit": [
+    {
+      "refNo": "CLAIM_REF_NO",
+      "receiptMatchStatus": "MATCH" | "AMOUNT_MISMATCH" | "DATE_MISMATCH" | "NO_RECEIPT",
+      "extractedReceiptAmt": "80.00",
+      "extractedReceiptNo": "inv1234",
+      "extractedReceiptDate": "03-07-2024",
+      "decision": "Approved" | "Rejected" | "Unclear",
+      "reasoning": "Brief explanation covering 2-way receipt match result and policy rule compliance"
+    }
+  ],
+  "totalsVerification": {
+    "subTotalStatus": "VERIFIED" | "DISCREPANCY",
+    "grandTotalStatus": "VERIFIED" | "DISCREPANCY",
+    "calculatedSum": "691.96",
+    "reportedSubTotal": "691.96",
+    "notes": "Brief statement verifying whether Sub Total and Grand Total are mathematically clear and correct."
   }
-]`,
+}`,
 
     async extractTextFromReceipt(fileObj) {
         if (!fileObj || !fileObj.content) return '';
 
-        // If plain text content
         if (fileObj.type === 'text/plain' || (!fileObj.content.startsWith('data:') && fileObj.content.length < 5000)) {
             return fileObj.content;
         }
@@ -34,7 +43,6 @@ Required JSON Output Array Format:
         const isPdf = (fileObj.name && fileObj.name.toLowerCase().endsWith('.pdf')) || fileObj.content.startsWith('data:application/pdf');
         const isImg = (fileObj.type && fileObj.type.startsWith('image')) || fileObj.content.startsWith('data:image');
 
-        // 1. PDF Text & OCR Extraction using PDF.js
         if (isPdf && window.pdfjsLib) {
             try {
                 window.SidePanelLog.log('p2 stage 2', `Extracting text from PDF: ${fileObj.name}...`);
@@ -57,7 +65,6 @@ Required JSON Output Array Format:
                     return extractedText;
                 }
 
-                // If PDF text is empty/scanned, render page 1 canvas for Tesseract OCR
                 if (window.Tesseract && pdf.numPages > 0) {
                     window.SidePanelLog.log('p2 stage 2', `Scanned PDF detected. Rendering page to canvas for Tesseract OCR: ${fileObj.name}...`);
                     const page = await pdf.getPage(1);
@@ -81,7 +88,6 @@ Required JSON Output Array Format:
             }
         }
 
-        // 2. Image OCR Extraction using Tesseract.js
         if (isImg && window.Tesseract) {
             try {
                 window.SidePanelLog.log('p2 stage 2', `Running Tesseract OCR on image: ${fileObj.name}...`);
@@ -95,7 +101,6 @@ Required JSON Output Array Format:
             }
         }
 
-        // Fallback: If no OCR or text extracted, pass file metadata summary so LLM can identify filename & details
         return `Receipt Document: ${fileObj.name}`;
     },
 
@@ -113,11 +118,13 @@ Required JSON Output Array Format:
 
         // Extract OCR text from row-specific attached receipts
         const claimsWithReceipts = [];
+        let totalClaimSum = 0;
         for (const claim of claims) {
             let attachedOcrText = '';
             if (claim.attachedReceipt) {
                 attachedOcrText = await this.extractTextFromReceipt(claim.attachedReceipt);
             }
+            totalClaimSum += parseFloat(claim.claimAmt || 0);
             claimsWithReceipts.push({
                 refNo: claim.refNo,
                 groupCode: claim.groupCode,
@@ -132,6 +139,12 @@ Required JSON Output Array Format:
             });
         }
 
+        const reportSummary = {
+            calculatedTotalClaimSum: totalClaimSum.toFixed(2),
+            reportSubTotalClaim: window.Stage1ClaimsIngestion?.parsedSubTotalClaim || totalClaimSum.toFixed(2),
+            reportGrandTotalClaim: window.Stage1ClaimsIngestion?.parsedGrandTotalClaim || totalClaimSum.toFixed(2)
+        };
+
         const userPrompt = `
 Corporate Policy:
 ${policyText}
@@ -139,19 +152,23 @@ ${policyText}
 Ingested Employee Claims Data (with Row-Attached Receipts):
 ${JSON.stringify(claimsWithReceipts, null, 2)}
 
+Report Totals Summary:
+${JSON.stringify(reportSummary, null, 2)}
+
 Task:
 1. For each claim row, analyze its row-attached receipt document OCR text (attachedReceiptOcrText).
 2. Extract actual receipt details: extractedReceiptAmt, extractedReceiptNo, extractedReceiptDate from the receipt.
 3. Compare claimAmt vs extractedReceiptAmt and claim details vs receipt details.
 4. Determine receiptMatchStatus: 'MATCH', 'AMOUNT_MISMATCH', 'DATE_MISMATCH', or 'NO_RECEIPT' (if attachedReceiptOcrText is null/empty).
 5. Evaluate policy compliance (Approved/Rejected/Unclear) and give clear audit reasoning.
-Return ONLY the JSON array.
+6. Verify whether Report Sub Total and Grand Total match the calculated sum of claim line items.
+Return ONLY the JSON object format specified in system prompt.
         `;
 
         const fixedModel = 'nvidia/nemotron-3-super-120b-a12b:free';
 
         try {
-            window.SidePanelLog.log('p2 stage 2', `Evaluating 2-Way Receipt Match & Policy (${fixedModel})...`);
+            window.SidePanelLog.log('p2 stage 2', `Evaluating 2-Way Receipt Match, Totals & Policy (${fixedModel})...`);
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -182,14 +199,26 @@ Return ONLY the JSON array.
             const data = await response.json();
             const content = data.choices[0].message.content || '';
 
-            // Extract JSON array robustly
-            const match = content.match(/\[[\s\S]*\]/);
-            const jsonStr = match ? match[0] : content.replace(/```json/g, '').replace(/```/g, '').trim();
-            const results = JSON.parse(jsonStr);
+            // Extract JSON object or array robustly
+            let parsedData;
+            const matchObj = content.match(/\{[\s\S]*\}/);
+            const matchArr = content.match(/\[[\s\S]*\]/);
 
-            this.renderResults(results, claims);
-            window.SidePanelLog.log('p2 stage 2', `2-Way Match & Policy Audit completed for ${results.length} claims.`);
-            return results;
+            if (matchObj) {
+                parsedData = JSON.parse(matchObj[0]);
+            } else if (matchArr) {
+                parsedData = { claimsAudit: JSON.parse(matchArr[0]), totalsVerification: null };
+            } else {
+                const cleaned = content.replace(/```json/g, '').replace(/```/g, '').trim();
+                parsedData = JSON.parse(cleaned);
+            }
+
+            const claimsAudit = Array.isArray(parsedData) ? parsedData : (parsedData.claimsAudit || []);
+            const totalsVerification = parsedData.totalsVerification || null;
+
+            this.renderResults(claimsAudit, claims, totalsVerification);
+            window.SidePanelLog.log('p2 stage 2', `2-Way Match, Totals & Policy Audit completed for ${claimsAudit.length} claims.`);
+            return claimsAudit;
         } catch (err) {
             console.error('AI Policy Check Error:', err);
             container.innerHTML = `<div class="empty-state text-danger"><p>AI Policy & Receipt Check Failed: ${err.message}</p></div>`;
@@ -198,8 +227,31 @@ Return ONLY the JSON array.
         }
     },
 
-    renderResults(results, originalClaims) {
-        let tableHtml = `
+    renderResults(results, originalClaims, totalsVerification = null) {
+        let totalsCardHtml = '';
+        if (totalsVerification) {
+            const isVerified = totalsVerification.subTotalStatus === 'VERIFIED' && totalsVerification.grandTotalStatus === 'VERIFIED';
+            const badgeClass = isVerified ? 'badge-match' : 'badge-discrepancy';
+            const iconClass = isVerified ? 'fa-circle-check text-success' : 'fa-triangle-exclamation text-danger';
+
+            totalsCardHtml = `
+                <div style="background: rgba(37, 99, 235, 0.04); border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <i class="fa-solid ${iconClass}" style="font-size: 1.6rem;"></i>
+                        <div>
+                            <div class="font-bold" style="font-size: 0.95rem;">AI Sub Total & Grand Total Verification</div>
+                            <div class="text-muted" style="font-size: 0.85rem; margin-top: 2px;">${totalsVerification.notes || 'Sub Total & Grand Total verified against claim line items.'}</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span class="badge ${badgeClass}" style="font-size: 0.85rem; padding: 6px 12px;">Sub Total: ${totalsVerification.subTotalStatus || 'VERIFIED'}</span>
+                        <span class="badge ${badgeClass}" style="font-size: 0.85rem; padding: 6px 12px;">Grand Total: ${totalsVerification.grandTotalStatus || 'VERIFIED'}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        let tableHtml = totalsCardHtml + `
             <table class="match-data-table">
                 <thead>
                     <tr>
