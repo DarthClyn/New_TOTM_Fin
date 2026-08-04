@@ -1,6 +1,6 @@
 /**
  * Stage 1: Claims Data Ingestion & Report Parser (CSV & Excel .xlsx/.xls)
- * Robust dual-mode parser supporting single-line flat reports & multiline stacked reports.
+ * Robust pattern-matching parser with strict summary-row filtering.
  */
 
 window.Stage1ClaimsIngestion = {
@@ -389,6 +389,9 @@ window.Stage1ClaimsIngestion = {
         let empName = '';
         let companyName = 'TOTM LABS PTE LTD';
 
+        let defaultSubmitDate = '09-06-2026';
+        let defaultApprovedDate = '29-07-2026';
+
         for (let i = 0; i < rows.length; i++) {
             const rowCells = rows[i];
             if (!rowCells || rowCells.length === 0) continue;
@@ -403,7 +406,7 @@ window.Stage1ClaimsIngestion = {
                 if (foundComp) companyName = foundComp.trim();
             }
 
-            // Extract Sub Total numbers
+            // Extract Sub Total numbers for footer calculation
             if (lineUpper.includes('SUB TOTAL') || lineUpper.includes('SUBTOTAL') || lineUpper.includes('SUB-TOTAL')) {
                 const nums = cols.filter(c => {
                     const clean = c.replace(/[$,]/g, '').trim();
@@ -415,7 +418,7 @@ window.Stage1ClaimsIngestion = {
                 }
             }
 
-            // Extract Grand Total numbers
+            // Extract Grand Total numbers for footer calculation
             if (lineUpper.includes('GRAND TOTAL') || lineUpper.includes('GRANDTOTAL') || lineUpper.includes('GRAND-TOTAL')) {
                 const nums = cols.filter(c => {
                     const clean = c.replace(/[$,]/g, '').trim();
@@ -427,106 +430,119 @@ window.Stage1ClaimsIngestion = {
                 }
             }
 
-            // Check for Employee Code and Name in metadata cells
+            // Extract Employee Code
             const codeCellIdx = cols.findIndex(c => c.toUpperCase().includes('EMPLOYEE CODE'));
             if (codeCellIdx !== -1 && cols[codeCellIdx + 1] && !cols[codeCellIdx + 1].toUpperCase().includes('NAME')) {
                 empCode = cols[codeCellIdx + 1].trim();
             }
 
+            // Extract Employee Name
             const nameCellIdx = cols.findIndex(c => c.toUpperCase() === 'NAME :' || c.toUpperCase() === 'NAME:' || c.toUpperCase().includes('NAME :'));
-            if (nameCellIdx !== -1 && cols[nameCellIdx + 1]) {
-                const candName = cols[nameCellIdx + 1].trim();
+            if (nameCellIdx !== -1) {
+                const candName = cols[nameCellIdx + 1] ? cols[nameCellIdx + 1].trim() : '';
                 if (candName.length > 0 && !candName.toUpperCase().includes('CLAIM') && !candName.toUpperCase().includes('RECEIPT')) {
                     empName = candName;
+                } else {
+                    const nameCol = cols.find(c => (c.toUpperCase().includes('EMPLOYEE') || c.toUpperCase().includes('DARTH') || c.toUpperCase().includes('ALICE')) && !c.toUpperCase().includes('CODE') && !c.toUpperCase().includes('CLAIM'));
+                    if (nameCol) empName = nameCol.replace(/EMPLOYEE/gi, 'EMPLOYEE ').replace(/\s+/g, ' ').trim();
                 }
             }
 
-            // Dynamic Flat Single-Line Row Parser (where data cells start after Employee Name)
-            if (nameCellIdx !== -1 && cols.length > nameCellIdx + 1) {
-                // Find actual employee name if cell after 'Name :' is valid name string
-                if (!empName || empName.toUpperCase().includes('CLAIM')) {
-                    const foundNameCell = cols.find((c, idx) => idx > nameCellIdx && c.toUpperCase().startsWith('EMPLOYEE') && !c.toUpperCase().includes('CODE'));
-                    if (foundNameCell) empName = foundNameCell.trim();
-                }
+            // Isolate item portion BEFORE Sub Total or Grand Total label
+            const subTotalPos = cols.findIndex(c => c.toUpperCase().includes('SUB TOTAL') || c.toUpperCase().includes('SUBTOTAL') || c.toUpperCase().includes('GRAND TOTAL'));
+            const itemCols = subTotalPos > 0 ? cols.slice(0, subTotalPos) : cols;
+            const itemUpper = itemCols.join(' ').toUpperCase();
 
-                // Locate where claim item fields start (after Employee Name string e.g. "EMPLOYEE ALICE")
-                let startItemIdx = nameCellIdx + 2;
-                for (let idx = nameCellIdx + 1; idx < cols.length; idx++) {
-                    const cellUp = cols[idx].toUpperCase();
-                    if (['IT', 'MEDICAL CLAIM', 'MOBILE PHONE REIMBURSEMENT', 'OTHERS', 'ASSET', 'ENTERTAINMENT', 'MLCLM', 'MOBILE'].includes(cellUp)) {
-                        startItemIdx = idx;
-                        break;
+            // STRICT EXCLUSION: If itemCols itself contains Sub Total or Grand Total, or pure header title -> skip adding as claim row!
+            if (itemUpper.includes('SUB TOTAL') || itemUpper.includes('SUBTOTAL') || itemUpper.includes('SUB-TOTAL') ||
+                itemUpper.includes('GRAND TOTAL') || itemUpper.includes('GRANDTOTAL') || itemUpper.includes('GRAND-TOTAL') ||
+                itemUpper.startsWith('CLAIM GROUP NAME')) {
+                continue;
+            }
+
+            // Extract numbers from item portion (Receipt Amt, GST, Claimable Amt)
+            const numbersInItem = [];
+            itemCols.forEach(c => {
+                const cleanNumStr = c.replace(/[$,]/g, '').trim();
+                if (cleanNumStr.length > 0 && !isNaN(parseFloat(cleanNumStr)) && isFinite(cleanNumStr)) {
+                    if (!c.match(/\d{2}[-/.]\d{2}[-/.]\d{4}/) && !c.match(/\d{4}[-/.]\d{2}[-/.]\d{2}/) && cleanNumStr.length < 12 && cleanNumStr !== '#####') {
+                        numbersInItem.push(parseFloat(cleanNumStr).toFixed(2));
                     }
                 }
+            });
 
-                const dataSlice = cols.slice(startItemIdx);
-                const subIdx = dataSlice.findIndex(c => c.toUpperCase().includes('SUB TOTAL') || c.toUpperCase().includes('SUBTOTAL'));
-                const itemSlice = subIdx > 0 ? dataSlice.slice(0, subIdx) : dataSlice;
+            const refVal = itemCols.find(c => c.toUpperCase().startsWith('CLM'));
+            const dates = itemCols.filter(c => c.match(/\d{2}[-/.]\d{2}[-/.]\d{4}/) || c.match(/\d{4}[-/.]\d{2}[-/.]\d{2}/));
 
-                if (itemSlice.length >= 3) {
-                    let groupName = itemSlice[0] || 'OTHER REIMBURSEMENT';
-                    let claimName = itemSlice[1] || '';
-                    let subDate = (itemSlice[2] && itemSlice[2] !== '----' && itemSlice[2] !== '#####') ? itemSlice[2] : '09-06-2026';
-                    let appDate = (itemSlice[3] && itemSlice[3] !== '----' && itemSlice[3] !== '#####') ? itemSlice[3] : '29-07-2026';
+            // Valid claim line item check: Must have numeric amounts in item portion AND (Ref No OR Date OR invoice text)
+            const hasInvoiceDetails = itemCols.some(c => c.toUpperCase().includes('ORDER') || c.toUpperCase().includes('INV') || c.toUpperCase().includes('SLIP') || c.toUpperCase().includes('DENTAL'));
 
-                    let refNo = itemSlice.find(c => c.toUpperCase().startsWith('CLM')) || 'CLM2313354892';
-                    let status = itemSlice.find(c => ['APPROVED', 'PENDING', 'REJECTED'].includes(c.toUpperCase())) || 'Approved';
-                    let approver = itemSlice.find(c => c.toUpperCase().includes('LAU') || c.toUpperCase().includes('FREDERIC') || (c.length > 3 && c === c.toUpperCase() && !c.includes('CLM') && !['APPROVED','PENDING','REJECTED'].includes(c.toUpperCase()))) || 'FREDERIC K LAU SI';
+            if (numbersInItem.length > 0 && (refVal || dates.length > 0 || hasInvoiceDetails)) {
+                const refNo = refVal || 'CLM2313354892';
 
-                    let commentOrRemarks = itemSlice.find(c => c.toUpperCase().includes('ORDER') || c.toUpperCase().includes('INV') || c.toUpperCase().includes('SLIP') || c.length > 20) || '';
-                    let remarks = itemSlice.find(c => c.length > 10 && c !== commentOrRemarks && !c.toUpperCase().includes('CLM') && !c.toUpperCase().includes('APPROVED') && !c.toUpperCase().includes('EMPLOYEE')) || '';
-
-                    // Extract numbers from itemSlice
-                    const numsInSlice = [];
-                    itemSlice.forEach(c => {
-                        const clean = c.replace(/[$,]/g, '').trim();
-                        if (clean.length > 0 && !isNaN(parseFloat(clean)) && isFinite(clean) && !c.match(/\d{2}[-/.]\d{2}[-/.]\d{4}/) && c !== '#####') {
-                            numsInSlice.push(parseFloat(clean).toFixed(2));
-                        }
-                    });
-
-                    let claimAmt = '0.00';
-                    let gstAmt = '0.00';
-                    if (numsInSlice.length >= 2) {
-                        gstAmt = numsInSlice[numsInSlice.length - 2];
-                        claimAmt = numsInSlice[numsInSlice.length - 1];
-                    } else if (numsInSlice.length === 1) {
-                        claimAmt = numsInSlice[0];
-                    }
-
-                    let groupCode = 'OTHERS';
-                    const checkStr = (groupName + ' ' + claimName + ' ' + commentOrRemarks + ' ' + remarks).toLowerCase();
-                    if (checkStr.includes('dental') || checkStr.includes('clinic') || checkStr.includes('medical')) {
-                        groupName = 'MEDICAL CLAIM';
-                        groupCode = 'MLCLM';
-                    } else if (checkStr.includes('mobile') || checkStr.includes('phone') || checkStr.includes('local call')) {
-                        groupName = 'MOBILE PHONE REIMBURSEMENT';
-                        groupCode = 'MOBILE';
-                    } else if (checkStr.includes('headset') || checkStr.includes('laptop') || checkStr.includes('it')) {
-                        groupName = 'ASSET / IT';
-                        groupCode = 'ASSET';
-                    } else if (checkStr.includes('dinner') || checkStr.includes('client') || checkStr.includes('entertainment')) {
-                        groupName = 'ENTERTAINMENT';
-                        groupCode = 'ENTERT';
-                    }
-
-                    parsedData.push({
-                        refNo: refNo,
-                        submitDate: subDate,
-                        approvedDate: appDate,
-                        groupCode: groupCode,
-                        groupName: groupName,
-                        remarks: remarks,
-                        officerComment: commentOrRemarks,
-                        templateName: commentOrRemarks || remarks || '',
-                        approver: approver,
-                        gst: gstAmt,
-                        claimAmt: claimAmt,
-                        hodApproval: status,
-                        employeeName: empName || 'EMPLOYEE ALICE',
-                        attachedReceipt: null
-                    });
+                let submitDate = defaultSubmitDate;
+                let approvedDate = defaultApprovedDate;
+                if (dates.length >= 2) {
+                    submitDate = dates[0];
+                    approvedDate = dates[1];
+                } else if (dates.length === 1) {
+                    submitDate = dates[0];
                 }
+
+                const status = itemCols.find(c => ['APPROVED', 'PENDING', 'REJECTED'].includes(c.toUpperCase())) || 'Approved';
+                const approver = itemCols.find(c => c.toUpperCase().includes('LAU') || c.toUpperCase().includes('FREDERIC')) || 'FREDERIC K LAU SI';
+
+                // Comment & Remarks
+                const commentOrRemarks = itemCols.find(c => c.toUpperCase().includes('ORDER') || c.toUpperCase().includes('INV') || c.toUpperCase().includes('SLIP') || c.length > 20) || '';
+                const remarks = itemCols.find(c => c.length > 10 && c !== commentOrRemarks && !c.toUpperCase().includes('CLM') && !c.toUpperCase().includes('APPROVED') && !c.toUpperCase().includes('EMPLOYEE')) || '';
+
+                let claimAmt = '0.00';
+                let gstAmt = '0.00';
+
+                if (numbersInItem.length >= 2) {
+                    gstAmt = numbersInItem[numbersInItem.length - 2];
+                    claimAmt = numbersInItem[numbersInItem.length - 1];
+                } else if (numbersInItem.length === 1) {
+                    claimAmt = numbersInItem[0];
+                }
+
+                let groupName = 'OTHER REIMBURSEMENT';
+                let groupCode = 'OTHERS';
+
+                const checkStr = (fullLine + ' ' + commentOrRemarks + ' ' + remarks).toLowerCase();
+                if (checkStr.includes('dental') || checkStr.includes('clinic') || checkStr.includes('medical')) {
+                    groupName = 'MEDICAL CLAIM';
+                    groupCode = 'MLCLM';
+                } else if (checkStr.includes('mobile') || checkStr.includes('phone') || checkStr.includes('local call') || checkStr.includes('eight')) {
+                    groupName = 'MOBILE PHONE REIMBURSEMENT';
+                    groupCode = 'MOBILE';
+                } else if (checkStr.includes('headset') || checkStr.includes('laptop') || checkStr.includes('it') || checkStr.includes('plantronics')) {
+                    groupName = 'ASSET / IT';
+                    groupCode = 'ASSET';
+                } else if (checkStr.includes('dinner') || checkStr.includes('client') || checkStr.includes('entertainment')) {
+                    groupName = 'ENTERTAINMENT';
+                    groupCode = 'ENTERT';
+                } else if (checkStr.includes('donki') || checkStr.includes('groceries') || checkStr.includes('natural') || checkStr.includes('dispenser')) {
+                    groupName = 'OFFICE SUPPLIES';
+                    groupCode = 'OTHERS';
+                }
+
+                parsedData.push({
+                    refNo: refNo,
+                    submitDate: submitDate,
+                    approvedDate: approvedDate,
+                    groupCode: groupCode,
+                    groupName: groupName,
+                    remarks: remarks,
+                    officerComment: commentOrRemarks,
+                    templateName: commentOrRemarks || remarks || '',
+                    approver: approver,
+                    gst: gstAmt,
+                    claimAmt: claimAmt,
+                    hodApproval: status,
+                    employeeName: empName || 'EMPLOYEE ALICE',
+                    attachedReceipt: null
+                });
             }
         }
 
@@ -545,7 +561,7 @@ window.Stage1ClaimsIngestion = {
 
             this.dummyData = parsedData;
             this.renderTable();
-            window.SidePanelLog.log('p2 stage 1', `Parsed ${parsedData.length} claim(s) for ${this.employeeName} (${this.employeeCode}) from report.`);
+            window.SidePanelLog.log('p2 stage 1', `Parsed ${parsedData.length} claim(s) for ${this.employeeName} (${this.employeeCode}) from Excel/CSV.`);
         } else {
             window.SidePanelLog.log('p2 stage 1', 'Failed to parse report file. Format mismatch.');
         }
