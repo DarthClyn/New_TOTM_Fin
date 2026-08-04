@@ -255,20 +255,21 @@ Return ONLY the JSON object format specified in system prompt.
         }
 
         let tableHtml = totalsCardHtml + `
-            <table class="match-data-table">
-                <thead>
-                    <tr>
-                        <th>Claim Ref No</th>
-                        <th>Group Name</th>
-                        <th>Claim Amt</th>
-                        <th>Extracted Receipt Amt</th>
-                        <th>2-Way Receipt Match</th>
-                        <th>HOD Approval</th>
-                        <th>AI Policy Decision</th>
-                        <th>Audit Reasoning</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color); border-radius: 8px;">
+                <table class="match-data-table" style="width: 100%; min-width: 1200px;">
+                    <thead>
+                        <tr>
+                            <th>Claim Ref No</th>
+                            <th>Group Name</th>
+                            <th>Claim Amt</th>
+                            <th>Extracted Receipt Amt</th>
+                            <th>2-Way Receipt Match</th>
+                            <th>HOD Approval</th>
+                            <th>AI Policy Decision</th>
+                            <th>Audit Reasoning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
 
         results.forEach((res, i) => {
@@ -311,7 +312,7 @@ Return ONLY the JSON object format specified in system prompt.
             `;
         });
 
-        tableHtml += `</tbody></table>`;
+        tableHtml += `</tbody></table></div>`;
         document.getElementById('stage2Content').innerHTML = tableHtml;
     }
 };

@@ -255,54 +255,56 @@ Output valid JSON:
                 tableContainer.innerHTML = '<div class="empty-state"><p>No relevant matching fields found.</p></div>';
             } else {
                 let tableHtml = `
-                    <table class="match-data-table">
-                        <thead>
-                            <tr>
-                                <th>Invoice Field</th>
-                                <th>Invoice Extracted Value</th>
-                                <th>Supporting Doc Source</th>
-                                <th>Supporting Doc Value</th>
-                                <th>Match Status</th>
-                                <th>Verification Notes</th>
-                                <th>Human Review Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${filteredResults.map((row, idx) => {
-                    let badgeClass = 'badge-match';
-                    if (row.status === 'DISCREPANCY') badgeClass = 'badge-discrepancy';
-                    else if (row.status === 'PARTIAL_MATCH') badgeClass = 'badge-partial';
+                    <div style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color); border-radius: 8px;">
+                        <table class="match-data-table" style="width: 100%; min-width: 1100px;">
+                            <thead>
+                                <tr>
+                                    <th>Invoice Field</th>
+                                    <th>Invoice Extracted Value</th>
+                                    <th>Supporting Doc Source</th>
+                                    <th>Supporting Doc Value</th>
+                                    <th>Match Status</th>
+                                    <th>Verification Notes</th>
+                                    <th>Human Review Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${filteredResults.map((row, idx) => {
+                        let badgeClass = 'badge-match';
+                        if (row.status === 'DISCREPANCY') badgeClass = 'badge-discrepancy';
+                        else if (row.status === 'PARTIAL_MATCH') badgeClass = 'badge-partial';
 
-                    const isMatched = row.status === 'MATCHED';
+                        const isMatched = row.status === 'MATCHED';
 
-                    return `
-                                    <tr>
-                                        <td class="font-bold">${row.field_name || '-'}</td>
-                                        <td id="inv_val_${idx}">${typeof row.invoice_value === 'object' ? JSON.stringify(row.invoice_value) : (row.invoice_value ?? '-')}</td>
-                                        <td><span class="doc-tag">${row.supporting_doc_source || 'N/A'}</span></td>
-                                        <td>${typeof row.supporting_doc_value === 'object' ? JSON.stringify(row.supporting_doc_value) : (row.supporting_doc_value ?? '-')}</td>
-                                        <td><span class="badge ${badgeClass}" id="status_badge_${idx}">${row.status || 'MATCHED'}</span></td>
-                                        <td class="text-sm-notes">${row.verification_notes || '-'}</td>
-                                        <td id="action_cell_${idx}">
-                                            ${isMatched ? '<span class="text-verified"><i class="fa-solid fa-check"></i> Verified</span>' : `
-                                                <div class="action-shortcut-group">
-                                                    <button class="btn btn-xs btn-success" onclick="window.Stage3AiMatcher.quickApproveRow(${idx})" title="Quick Approve">
-                                                        <i class="fa-solid fa-check"></i>
-                                                    </button>
-                                                    <button class="btn btn-xs btn-danger" onclick="window.Stage3AiMatcher.quickRejectRow(${idx})" title="Quick Reject">
-                                                        <i class="fa-solid fa-xmark"></i>
-                                                    </button>
-                                                    <button class="btn btn-xs btn-outline" onclick="window.Stage3AiMatcher.openHumanReviewModal(${idx})" title="Detailed Review Drawer">
-                                                        <i class="fa-solid fa-eye"></i> View Review
-                                                    </button>
-                                                </div>
-                                            `}
-                                        </td>
-                                    </tr>
-                                `;
-                }).join('')}
-                        </tbody>
-                    </table>
+                        return `
+                                        <tr>
+                                            <td class="font-bold">${row.field_name || '-'}</td>
+                                            <td id="inv_val_${idx}">${typeof row.invoice_value === 'object' ? JSON.stringify(row.invoice_value) : (row.invoice_value ?? '-')}</td>
+                                            <td><span class="doc-tag">${row.supporting_doc_source || 'N/A'}</span></td>
+                                            <td>${typeof row.supporting_doc_value === 'object' ? JSON.stringify(row.supporting_doc_value) : (row.supporting_doc_value ?? '-')}</td>
+                                            <td><span class="badge ${badgeClass}" id="status_badge_${idx}">${row.status || 'MATCHED'}</span></td>
+                                            <td class="text-sm-notes">${row.verification_notes || '-'}</td>
+                                            <td id="action_cell_${idx}">
+                                                ${isMatched ? '<span class="text-verified"><i class="fa-solid fa-check"></i> Verified</span>' : `
+                                                    <div class="action-shortcut-group">
+                                                        <button class="btn btn-xs btn-success" onclick="window.Stage3AiMatcher.quickApproveRow(${idx})" title="Quick Approve">
+                                                            <i class="fa-solid fa-check"></i>
+                                                        </button>
+                                                        <button class="btn btn-xs btn-danger" onclick="window.Stage3AiMatcher.quickRejectRow(${idx})" title="Quick Reject">
+                                                            <i class="fa-solid fa-xmark"></i>
+                                                        </button>
+                                                        <button class="btn btn-xs btn-outline" onclick="window.Stage3AiMatcher.openHumanReviewModal(${idx})" title="Detailed Review Drawer">
+                                                            <i class="fa-solid fa-eye"></i> View Review
+                                                        </button>
+                                                    </div>
+                                                `}
+                                            </td>
+                                        </tr>
+                                    `;
+                    }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 `;
                 tableContainer.innerHTML = tableHtml;
             }
