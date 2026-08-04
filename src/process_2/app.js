@@ -3,9 +3,13 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Render table by default on load
+    // Render table & receipt cards by default on load
     if (window.Stage1ClaimsIngestion) {
-        window.Stage1ClaimsIngestion.renderTable();
+        if (window.Stage1ClaimsIngestion.init) {
+            window.Stage1ClaimsIngestion.init();
+        } else {
+            window.Stage1ClaimsIngestion.renderTable();
+        }
     }
 
     // Bind Save Claims Button
@@ -141,11 +145,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const claims = window.Stage1ClaimsIngestion.dummyData;
                 const policy = policyText.value;
+                const receiptFiles = window.Stage1ClaimsIngestion.receiptFiles;
 
                 // STAGE 2
                 document.getElementById('stage2Status').textContent = 'Processing...';
                 document.getElementById('stage2Status').className = 'badge badge-accent';
-                aiDecisionsState = await window.Stage2PolicyChecker.run(claims, policy);
+                aiDecisionsState = await window.Stage2PolicyChecker.run(claims, policy, receiptFiles);
                 if (!aiDecisionsState) throw new Error('Stage 2 failed');
                 document.getElementById('stage2Status').textContent = 'Complete';
                 document.getElementById('stage2Status').className = 'badge badge-match';
@@ -208,11 +213,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 const claims = window.Stage1ClaimsIngestion.dummyData;
                 const policy = policyText.value;
+                const receiptFiles = window.Stage1ClaimsIngestion.receiptFiles;
 
                 document.getElementById('stage2Status').textContent = 'Processing...';
                 document.getElementById('stage2Status').className = 'badge badge-accent';
                 
-                aiDecisionsState = await window.Stage2PolicyChecker.run(claims, policy);
+                aiDecisionsState = await window.Stage2PolicyChecker.run(claims, policy, receiptFiles);
                 
                 if (!aiDecisionsState) throw new Error('Stage 2 failed');
                 
@@ -223,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Stage 2 encountered an error.");
             } finally {
                 runStage2Btn.disabled = false;
-                runStage2Btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Policy Checker';
+                runStage2Btn.innerHTML = '<i class="fa-solid fa-play"></i> Run AI + OCR Match & Policy Check';
             }
         });
     }

@@ -29,13 +29,23 @@ class InvoiceAuditRecordResponse(InvoiceAuditRecordCreate):
 
 class EmployeeClaimRecordCreate(BaseModel):
     ref_no: str
-    gl_code: str
+    employee_code: Optional[str] = None
+    employee_name: Optional[str] = None
+    submit_date: Optional[str] = None
+    approved_date: Optional[str] = None
+    group_code: Optional[str] = None
     group_name: str
+    template_name: Optional[str] = None
     receipt_no: Optional[str] = None
     receipt_date: Optional[str] = None
+    approver: Optional[str] = None
+    gst: Optional[float] = 0.0
     claimable_amt: float
     hod_approval: str
-    employee_name: Optional[str] = None
+    policy_decision: Optional[str] = None
+    reasoning: Optional[str] = None
+    gl_code: str
+    target_system: Optional[str] = None
     status: str
 
 class EmployeeClaimRecordResponse(EmployeeClaimRecordCreate):

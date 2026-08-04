@@ -6,6 +6,12 @@
     <title>Process 2: Employee Claims Automation</title>
     <link rel="stylesheet" href="../common/ui/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tesseract OCR CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <!-- pdf.js CDN for PDF page rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- SheetJS CDN for Excel parsing (.xlsx/.xls) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div class="app-layout-wrapper">
@@ -35,20 +41,28 @@
             <main class="main-workspace-vertical">
                 <section class="panel-full stage-panel">
                     <div class="panel-header">
-                        <h2><i class="fa-solid fa-file-invoice"></i> 1. Ingesting Claim Data</h2>
+                        <h2><i class="fa-solid fa-file-invoice"></i> 1. Ingesting Claim Data & Receipts</h2>
                         <span class="badge badge-match">Ready</span>
                     </div>
 
                     <div class="card p-4">
-                        <div style="margin-bottom: 24px;">
-                            <h3 class="text-lg font-bold" style="margin-bottom: 12px;">Ingested Claims Table</h3>
-                            <button class="btn btn-outline" onclick="document.getElementById('claimsUpload').click()" style="margin-right: 8px;">
-                                <i class="fa-solid fa-file-csv"></i> Upload Claims CSV
-                            </button>
-                            <input type="file" id="claimsUpload" accept=".csv" style="display: none;">
-                            <button class="btn btn-primary" id="saveClaimsBtn">
-                                <i class="fa-solid fa-save"></i> Save Changes
-                            </button>
+                        <div style="margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                            <h3 class="text-lg font-bold">Ingested Claims Table</h3>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <button class="btn btn-outline" onclick="document.getElementById('claimsUpload').click()">
+                                    <i class="fa-solid fa-file-csv text-accent"></i> Upload Claims CSV
+                                </button>
+                                <input type="file" id="claimsUpload" accept=".csv" style="display: none;">
+
+                                <button class="btn btn-success" onclick="document.getElementById('claimsExcelUpload').click()">
+                                    <i class="fa-solid fa-file-excel"></i> Upload Claims Excel (.xlsx / .xls)
+                                </button>
+                                <input type="file" id="claimsExcelUpload" accept=".xlsx,.xls,.csv" style="display: none;">
+
+                                <button class="btn btn-primary" id="saveClaimsBtn">
+                                    <i class="fa-solid fa-save"></i> Save Changes
+                                </button>
+                            </div>
                         </div>
                         
                         <div id="claimsTableContainer" class="table-container">
@@ -60,7 +74,7 @@
                     </div>
 
                     <!-- Stage 1 Part 2: Policy Config -->
-                    <div class="card p-4 mt-4">
+                    <div class="card p-4 mt-4" style="margin-top: 24px; margin-bottom: 24px; padding: 24px;">
                         <div class="flex-between mb-4">
                             <div>
                                 <h3 class="text-lg font-bold">Claim Policy Configuration</h3>
@@ -96,20 +110,20 @@ Check the claim details against these limits.</textarea>
                     </div>
                 </section>
 
-                <!-- STAGE 2: AI POLICY CHECKER -->
+                <!-- STAGE 2: AI + OCR MATCHING & AI POLICY CHECKER -->
                 <section class="panel-full stage-panel">
                     <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
                         <div style="display: flex; align-items: center; gap: 12px;">
-                            <h2><i class="fa-solid fa-robot"></i> 2. AI Policy Checker</h2>
+                            <h2><i class="fa-solid fa-robot"></i> 2. AI + OCR Matching & AI Policy Checker</h2>
                             <span class="badge" id="stage2Status">Pending</span>
                         </div>
                         <button class="btn btn-primary" id="runStage2Btn">
-                            <i class="fa-solid fa-play"></i> Run Policy Checker
+                            <i class="fa-solid fa-play"></i> Run AI + OCR Match & Policy Check
                         </button>
                     </div>
                     <div class="card p-4" id="stage2Content">
                         <div class="empty-state">
-                            <p>AI Policy Check results will appear here after running the process.</p>
+                            <p>AI + OCR 2-Way Receipt Match & Policy Check results will appear here after running the process.</p>
                         </div>
                     </div>
                 </section>

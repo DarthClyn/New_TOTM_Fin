@@ -1170,3 +1170,29 @@ body {
 .hidden {
     display: none !important;
 }
+
+/* Slidable Responsive Table Container */
+.table-container, #claimsTableContainer {
+    width: 100%;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: var(--bg-panel);
+    margin-top: 12px;
+}
+
+.match-data-table {
+    width: 100%;
+    min-width: 1350px !important;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.match-data-table th, 
+.match-data-table td {
+    padding: 10px 12px;
+    text-align: left;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border-color);
+}
