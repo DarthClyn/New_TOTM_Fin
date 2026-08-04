@@ -1,7 +1,7 @@
 /**
  * Stage 2: OCR + AI 2-Way Receipt Matcher & Policy Checker
- * Performs OCR extraction on uploaded receipt files, matches receipts against claims (2-Way Match),
- * and evaluates policy compliance.
+ * Performs OCR extraction on uploaded receipt files, matches receipts against claims by row index,
+ * and evaluates policy compliance & total verification.
  */
 
 window.Stage2PolicyChecker = {
@@ -15,11 +15,12 @@ Required JSON Output Object Format:
 {
   "claimsAudit": [
     {
-      "refNo": "CLAIM_REF_NO",
+      "rowIndex": 0,
+      "refNo": "CLM2313354892",
       "receiptMatchStatus": "MATCH" | "AMOUNT_MISMATCH" | "DATE_MISMATCH" | "NO_RECEIPT",
-      "extractedReceiptAmt": "80.00",
+      "extractedReceiptAmt": "198.45",
       "extractedReceiptNo": "inv1234",
-      "extractedReceiptDate": "03-07-2024",
+      "extractedReceiptDate": "09-06-2026",
       "decision": "Approved" | "Rejected" | "Unclear",
       "reasoning": "Brief explanation covering 2-way receipt match result and policy rule compliance"
     }
@@ -116,23 +117,26 @@ Required JSON Output Object Format:
 
         window.SidePanelLog.log('p2 stage 2', `Processing row-attached receipts for ${claims.length} claim(s)...`);
 
-        // Extract OCR text from row-specific attached receipts
         const claimsWithReceipts = [];
         let totalClaimSum = 0;
-        for (const claim of claims) {
+
+        for (let idx = 0; idx < claims.length; idx++) {
+            const claim = claims[idx];
             let attachedOcrText = '';
             if (claim.attachedReceipt) {
                 attachedOcrText = await this.extractTextFromReceipt(claim.attachedReceipt);
             }
             totalClaimSum += parseFloat(claim.claimAmt || 0);
+
             claimsWithReceipts.push({
+                rowIndex: idx,
                 refNo: claim.refNo,
                 groupCode: claim.groupCode,
                 groupName: claim.groupName,
-                templateName: claim.templateName,
-                receiptNo: claim.receiptNo,
-                receiptDate: claim.receiptDate,
+                officerComment: claim.officerComment || claim.templateName || '',
+                remarks: claim.remarks || '',
                 claimAmt: claim.claimAmt,
+                gst: claim.gst || '0.00',
                 hodApproval: claim.hodApproval,
                 attachedReceiptFileName: claim.attachedReceipt?.name || null,
                 attachedReceiptOcrText: attachedOcrText || null
@@ -156,11 +160,11 @@ Report Totals Summary:
 ${JSON.stringify(reportSummary, null, 2)}
 
 Task:
-1. For each claim row, analyze its row-attached receipt document OCR text (attachedReceiptOcrText).
+1. For each claim row (by rowIndex), analyze its row-attached receipt document OCR text (attachedReceiptOcrText).
 2. Extract actual receipt details: extractedReceiptAmt, extractedReceiptNo, extractedReceiptDate from the receipt.
 3. Compare claimAmt vs extractedReceiptAmt and claim details vs receipt details.
 4. Determine receiptMatchStatus: 'MATCH', 'AMOUNT_MISMATCH', 'DATE_MISMATCH', or 'NO_RECEIPT' (if attachedReceiptOcrText is null/empty).
-5. Evaluate policy compliance (Approved/Rejected/Unclear) and give clear audit reasoning.
+5. Evaluate policy compliance (Approved/Rejected/Unclear) and give clear audit reasoning. Note: Dental claims capped at SGD300 are Approved if compliant.
 6. Verify whether Report Sub Total and Grand Total match the calculated sum of claim line items.
 Return ONLY the JSON object format specified in system prompt.
         `;
@@ -199,7 +203,6 @@ Return ONLY the JSON object format specified in system prompt.
             const data = await response.json();
             const content = data.choices[0].message.content || '';
 
-            // Extract JSON object or array robustly
             let parsedData;
             const matchObj = content.match(/\{[\s\S]*\}/);
             const matchArr = content.match(/\[[\s\S]*\]/);
@@ -268,8 +271,9 @@ Return ONLY the JSON object format specified in system prompt.
                 <tbody>
         `;
 
-        results.forEach(res => {
-            const original = originalClaims.find(c => c.refNo === res.refNo) || {};
+        results.forEach((res, i) => {
+            const targetIdx = (res.rowIndex !== undefined && res.rowIndex !== null && !isNaN(res.rowIndex)) ? parseInt(res.rowIndex) : i;
+            const original = originalClaims[targetIdx] || originalClaims[i] || {};
             const matchStatus = res.receiptMatchStatus || 'NO_RECEIPT';
 
             let matchBadgeClass = 'badge-match';
@@ -295,7 +299,7 @@ Return ONLY the JSON object format specified in system prompt.
 
             tableHtml += `
                 <tr>
-                    <td class="font-bold">${res.refNo}</td>
+                    <td class="font-bold">${res.refNo || original.refNo}</td>
                     <td>${original.groupName || 'N/A'}</td>
                     <td class="font-mono">${original.claimAmt ? '$' + original.claimAmt : 'N/A'}</td>
                     <td class="font-mono">${res.extractedReceiptAmt ? '$' + res.extractedReceiptAmt : 'N/A'}</td>
