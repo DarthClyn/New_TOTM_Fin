@@ -124,46 +124,48 @@ window.Stage4Database = {
             <div style="margin-bottom: 12px; text-align: right;">
                 <button class="btn btn-outline" onclick="window.Stage4Database.clearDatabaseRecords()">Clear DB</button>
             </div>
-            <table class="sql-db-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Claim Ref No</th>
-                        <th>Emp Code</th>
-                        <th>Emp Name</th>
-                        <th>Submit Date</th>
-                        <th>Approved Date</th>
-                        <th>Group Name</th>
-                        <th>Comments</th>
-                        <th>Approver</th>
-                        <th>GST ($)</th>
-                        <th>Claimable ($)</th>
-                        <th>GL Code</th>
-                        <th>Target System</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${records.map(r => `
+            <div style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color); border-radius: 8px;">
+                <table class="sql-db-table" style="width: 100%; min-width: 1500px;">
+                    <thead>
                         <tr>
-                            <td class="font-mono text-muted">${r.id}</td>
-                            <td class="font-bold">${r.ref_no}</td>
-                            <td>${r.employee_code || 'EMP-001'}</td>
-                            <td>${r.employee_name || 'ALICE'}</td>
-                            <td class="font-mono">${r.submit_date || ''}</td>
-                            <td class="font-mono">${r.approved_date || ''}</td>
-                            <td>${r.group_name}</td>
-                            <td class="text-muted" style="max-width: 180px; font-size: 0.85em;">${r.template_name || ''}</td>
-                            <td>${r.approver || ''}</td>
-                            <td class="font-mono">$${typeof r.gst === 'number' ? r.gst.toFixed(2) : (r.gst || '0.00')}</td>
-                            <td class="font-mono text-verified">$${typeof r.claimable_amt === 'number' ? r.claimable_amt.toFixed(2) : r.claimable_amt}</td>
-                            <td><span class="badge badge-accent">${r.gl_code}</span></td>
-                            <td><span class="badge badge-partial">${r.target_system || 'SAP'}</span></td>
-                            <td><span class="badge badge-match">${r.status}</span></td>
+                            <th>ID</th>
+                            <th>Claim Ref No</th>
+                            <th>Emp Code</th>
+                            <th>Emp Name</th>
+                            <th>Submit Date</th>
+                            <th>Approved Date</th>
+                            <th>Group Name</th>
+                            <th>Comments</th>
+                            <th>Approver</th>
+                            <th>GST ($)</th>
+                            <th>Claimable ($)</th>
+                            <th>GL Code</th>
+                            <th>Target System</th>
+                            <th>Status</th>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        ${records.map(r => `
+                            <tr>
+                                <td class="font-mono text-muted">${r.id}</td>
+                                <td class="font-bold">${r.ref_no}</td>
+                                <td>${r.employee_code || 'EMP-001'}</td>
+                                <td>${r.employee_name || 'ALICE'}</td>
+                                <td class="font-mono">${r.submit_date || ''}</td>
+                                <td class="font-mono">${r.approved_date || ''}</td>
+                                <td>${r.group_name}</td>
+                                <td class="text-muted" style="max-width: 180px; font-size: 0.85em;">${r.template_name || ''}</td>
+                                <td>${r.approver || ''}</td>
+                                <td class="font-mono">$${typeof r.gst === 'number' ? r.gst.toFixed(2) : (r.gst || '0.00')}</td>
+                                <td class="font-mono text-verified">$${typeof r.claimable_amt === 'number' ? r.claimable_amt.toFixed(2) : r.claimable_amt}</td>
+                                <td><span class="badge badge-accent">${r.gl_code}</span></td>
+                                <td><span class="badge badge-partial">${r.target_system || 'SAP'}</span></td>
+                                <td><span class="badge badge-match">${r.status}</span></td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
         `;
 
         tableContainer.innerHTML = html;

@@ -164,7 +164,7 @@ Task:
 2. Extract actual receipt details: extractedReceiptAmt, extractedReceiptNo, extractedReceiptDate from the receipt.
 3. Compare claimAmt vs extractedReceiptAmt and claim details vs receipt details.
 4. Determine receiptMatchStatus: 'MATCH', 'AMOUNT_MISMATCH', 'DATE_MISMATCH', or 'NO_RECEIPT' (if attachedReceiptOcrText is null/empty).
-5. Evaluate policy compliance (Approved/Rejected/Unclear) and give clear audit reasoning. Note: Dental claims capped at SGD300 are Approved if compliant.
+5. Evaluate policy compliance (Approved/Rejected/Unclear) strictly according to the provided Corporate Policy text and give clear audit reasoning.
 6. Verify whether Report Sub Total and Grand Total match the calculated sum of claim line items.
 Return ONLY the JSON object format specified in system prompt.
         `;

@@ -1,6 +1,6 @@
 /**
  * Stage 1: Claims Data Ingestion & Report Parser (CSV & Excel .xlsx/.xls)
- * Robust pattern-matching parser with strict summary-row filtering.
+ * Robust pattern-matching parser with strict regex-based group classification.
  */
 
 window.Stage1ClaimsIngestion = {
@@ -392,6 +392,32 @@ window.Stage1ClaimsIngestion = {
         let defaultSubmitDate = '09-06-2026';
         let defaultApprovedDate = '29-07-2026';
 
+        // Extract Employee Code & Name globally from entire document text
+        const fullDocText = rows.map(r => r.join(' ')).join('\n');
+        
+        const globalCodeMatch = fullDocText.match(/Employee Code\s*[:]?\s*([A-Za-z0-9_-]+)/i);
+        if (globalCodeMatch && globalCodeMatch[1] && !globalCodeMatch[1].toUpperCase().includes('NAME')) {
+            empCode = globalCodeMatch[1].trim();
+        }
+
+        const globalNameMatch = fullDocText.match(/Name\s*[:]?\s*([A-Za-z0-9\s_-]+?)(?=\s+IT|\s+MEDICAL|\s+MOBILE|\s+OTHERS|\s+CLM|\s+$|\r|\n)/i);
+        if (globalNameMatch && globalNameMatch[1]) {
+            const candidate = globalNameMatch[1].trim();
+            if (!candidate.toUpperCase().includes('CLAIM') && !candidate.toUpperCase().includes('RECEIPT')) {
+                empName = candidate;
+            }
+        }
+
+        if (!empName) {
+            for (const r of rows) {
+                const empCell = r.find(c => String(c).toUpperCase().includes('EMPLOYEE') && !String(c).toUpperCase().includes('CODE') && !String(c).toUpperCase().includes('CLAIM'));
+                if (empCell) {
+                    empName = String(empCell).replace(/EMPLOYEE/gi, 'EMPLOYEE ').replace(/[:]/g, '').replace(/\s+/g, ' ').trim();
+                    break;
+                }
+            }
+        }
+
         for (let i = 0; i < rows.length; i++) {
             const rowCells = rows[i];
             if (!rowCells || rowCells.length === 0) continue;
@@ -430,30 +456,12 @@ window.Stage1ClaimsIngestion = {
                 }
             }
 
-            // Extract Employee Code
-            const codeCellIdx = cols.findIndex(c => c.toUpperCase().includes('EMPLOYEE CODE'));
-            if (codeCellIdx !== -1 && cols[codeCellIdx + 1] && !cols[codeCellIdx + 1].toUpperCase().includes('NAME')) {
-                empCode = cols[codeCellIdx + 1].trim();
-            }
-
-            // Extract Employee Name
-            const nameCellIdx = cols.findIndex(c => c.toUpperCase() === 'NAME :' || c.toUpperCase() === 'NAME:' || c.toUpperCase().includes('NAME :'));
-            if (nameCellIdx !== -1) {
-                const candName = cols[nameCellIdx + 1] ? cols[nameCellIdx + 1].trim() : '';
-                if (candName.length > 0 && !candName.toUpperCase().includes('CLAIM') && !candName.toUpperCase().includes('RECEIPT')) {
-                    empName = candName;
-                } else {
-                    const nameCol = cols.find(c => (c.toUpperCase().includes('EMPLOYEE') || c.toUpperCase().includes('DARTH') || c.toUpperCase().includes('ALICE')) && !c.toUpperCase().includes('CODE') && !c.toUpperCase().includes('CLAIM'));
-                    if (nameCol) empName = nameCol.replace(/EMPLOYEE/gi, 'EMPLOYEE ').replace(/\s+/g, ' ').trim();
-                }
-            }
-
             // Isolate item portion BEFORE Sub Total or Grand Total label
             const subTotalPos = cols.findIndex(c => c.toUpperCase().includes('SUB TOTAL') || c.toUpperCase().includes('SUBTOTAL') || c.toUpperCase().includes('GRAND TOTAL'));
             const itemCols = subTotalPos > 0 ? cols.slice(0, subTotalPos) : cols;
             const itemUpper = itemCols.join(' ').toUpperCase();
 
-            // STRICT EXCLUSION: If itemCols itself contains Sub Total or Grand Total, or pure header title -> skip adding as claim row!
+            // STRICT EXCLUSION: Skip header and summary lines
             if (itemUpper.includes('SUB TOTAL') || itemUpper.includes('SUBTOTAL') || itemUpper.includes('SUB-TOTAL') ||
                 itemUpper.includes('GRAND TOTAL') || itemUpper.includes('GRANDTOTAL') || itemUpper.includes('GRAND-TOTAL') ||
                 itemUpper.startsWith('CLAIM GROUP NAME')) {
@@ -509,20 +517,22 @@ window.Stage1ClaimsIngestion = {
                 let groupName = 'OTHER REIMBURSEMENT';
                 let groupCode = 'OTHERS';
 
-                const checkStr = (fullLine + ' ' + commentOrRemarks + ' ' + remarks).toLowerCase();
-                if (checkStr.includes('dental') || checkStr.includes('clinic') || checkStr.includes('medical')) {
+                // CRITICAL FIX: Use strict word boundary regex on item details (do NOT check raw 'it' substring)
+                const descStr = (commentOrRemarks + ' ' + remarks + ' ' + itemCols.slice(22).join(' ')).toLowerCase();
+
+                if (/\b(dental|clinic|medical|doctor|cove|mlclm)\b/i.test(descStr)) {
                     groupName = 'MEDICAL CLAIM';
                     groupCode = 'MLCLM';
-                } else if (checkStr.includes('mobile') || checkStr.includes('phone') || checkStr.includes('local call') || checkStr.includes('eight')) {
+                } else if (/\b(mobile|phone|local call|eight|sim)\b/i.test(descStr)) {
                     groupName = 'MOBILE PHONE REIMBURSEMENT';
                     groupCode = 'MOBILE';
-                } else if (checkStr.includes('headset') || checkStr.includes('laptop') || checkStr.includes('it') || checkStr.includes('plantronics')) {
+                } else if (/\b(headset|laptop|plantronics|voyager|hardware|software)\b/i.test(descStr) || itemCols.includes('IT')) {
                     groupName = 'ASSET / IT';
                     groupCode = 'ASSET';
-                } else if (checkStr.includes('dinner') || checkStr.includes('client') || checkStr.includes('entertainment')) {
+                } else if (/\b(dinner|client|entertainment|meal)\b/i.test(descStr)) {
                     groupName = 'ENTERTAINMENT';
                     groupCode = 'ENTERT';
-                } else if (checkStr.includes('donki') || checkStr.includes('groceries') || checkStr.includes('natural') || checkStr.includes('dispenser')) {
+                } else if (/\b(donki|groceries|natural|dispenser|water|pantry|stationery|supplies)\b/i.test(descStr)) {
                     groupName = 'OFFICE SUPPLIES';
                     groupCode = 'OTHERS';
                 }
