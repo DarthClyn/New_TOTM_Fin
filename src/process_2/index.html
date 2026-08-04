@@ -10,6 +10,8 @@
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <!-- pdf.js CDN for PDF page rendering -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- SheetJS CDN for Excel parsing (.xlsx/.xls) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div class="app-layout-wrapper">
@@ -44,15 +46,23 @@
                     </div>
 
                     <div class="card p-4">
-                        <div style="margin-bottom: 24px;">
-                            <h3 class="text-lg font-bold" style="margin-bottom: 12px;">Ingested Claims Table</h3>
-                            <button class="btn btn-outline" onclick="document.getElementById('claimsUpload').click()" style="margin-right: 8px;">
-                                <i class="fa-solid fa-file-csv"></i> Upload Claims CSV
-                            </button>
-                            <input type="file" id="claimsUpload" accept=".csv" style="display: none;">
-                            <button class="btn btn-primary" id="saveClaimsBtn">
-                                <i class="fa-solid fa-save"></i> Save Changes
-                            </button>
+                        <div style="margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                            <h3 class="text-lg font-bold">Ingested Claims Table</h3>
+                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                <button class="btn btn-outline" onclick="document.getElementById('claimsUpload').click()">
+                                    <i class="fa-solid fa-file-csv text-accent"></i> Upload Claims CSV
+                                </button>
+                                <input type="file" id="claimsUpload" accept=".csv" style="display: none;">
+
+                                <button class="btn btn-success" onclick="document.getElementById('claimsExcelUpload').click()">
+                                    <i class="fa-solid fa-file-excel"></i> Upload Claims Excel (.xlsx / .xls)
+                                </button>
+                                <input type="file" id="claimsExcelUpload" accept=".xlsx,.xls,.csv" style="display: none;">
+
+                                <button class="btn btn-primary" id="saveClaimsBtn">
+                                    <i class="fa-solid fa-save"></i> Save Changes
+                                </button>
+                            </div>
                         </div>
                         
                         <div id="claimsTableContainer" class="table-container">
