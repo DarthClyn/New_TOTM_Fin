@@ -14,7 +14,13 @@ window.Stage1ClaimsIngestion = {
             receiptDate: "03-07-2024",
             receiptAmt: "80.00",
             claimAmt: "80.00",
-            hodApproval: "Pending"
+            hodApproval: "Pending",
+            attachedReceipt: {
+                name: "Receipt_CLM656202656.txt",
+                size: 142,
+                type: "text/plain",
+                content: "MEDICAL CLINIC RECEIPT\nReceipt No: inv1234\nDate: 03-07-2024\nPatient: Ali\nTotal Amount: SGD 80.00\nPaid in Full"
+            }
         },
         {
             refNo: "CLM998202657",
@@ -25,7 +31,13 @@ window.Stage1ClaimsIngestion = {
             receiptDate: "15-08-2024",
             receiptAmt: "150.00",
             claimAmt: "150.00",
-            hodApproval: "Approved"
+            hodApproval: "Approved",
+            attachedReceipt: {
+                name: "Receipt_CLM998202657.txt",
+                size: 156,
+                type: "text/plain",
+                content: "TECH LAPTOP REPAIR CENTER\nReceipt No: RPT-0092\nDate: 15-08-2024\nDescription: Laptop keyboard repair\nTotal Paid: SGD 150.00"
+            }
         },
         {
             refNo: "CLM112202658",
@@ -36,7 +48,13 @@ window.Stage1ClaimsIngestion = {
             receiptDate: "22-08-2024",
             receiptAmt: "320.50",
             claimAmt: "320.50",
-            hodApproval: "Not Approved"
+            hodApproval: "Not Approved",
+            attachedReceipt: {
+                name: "Receipt_CLM112202658.txt",
+                size: 168,
+                type: "text/plain",
+                content: "MARINA BAY FINE DINING\nReceipt No: DIN-4421\nDate: 22-08-2024\nClient Dinner 4 Pax\nSubtotal: $300.00, GST: $20.50\nTotal: SGD 320.50"
+            }
         },
         {
             refNo: "CLM443202659",
@@ -47,7 +65,8 @@ window.Stage1ClaimsIngestion = {
             receiptDate: "01-09-2024",
             receiptAmt: "45.00",
             claimAmt: "45.00",
-            hodApproval: "Approved"
+            hodApproval: "Approved",
+            attachedReceipt: null
         },
         {
             refNo: "CLM775202660",
@@ -58,9 +77,170 @@ window.Stage1ClaimsIngestion = {
             receiptDate: "05-09-2024",
             receiptAmt: "60.00",
             claimAmt: "60.00",
-            hodApproval: "Pending"
+            hodApproval: "Pending",
+            attachedReceipt: null
         }
     ],
+
+    receiptFiles: [],
+
+    init() {
+        this.renderTable();
+    },
+
+    bindReceiptEvents() {
+        const input1 = document.getElementById('receiptInput');
+        const input2 = document.getElementById('receiptDropzoneInput');
+
+        const handleFiles = (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                this.handleReceiptFilesSelect(e.target.files);
+            }
+        };
+
+        if (input1) input1.addEventListener('change', handleFiles);
+        if (input2) input2.addEventListener('change', handleFiles);
+    },
+
+    async handleRowReceiptUpload(index, fileList) {
+        if (!fileList || fileList.length === 0) return;
+        
+        // Save any ongoing user edits before re-rendering
+        this.saveChanges();
+
+        const file = fileList[0];
+        let content = '';
+        let fileType = file.type || '';
+
+        if (file.name.endsWith('.pdf')) {
+            fileType = 'application/pdf';
+        } else if (file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
+            fileType = 'text/plain';
+        } else if (file.type.startsWith('image/')) {
+            fileType = 'image';
+        }
+
+        if (fileType === 'text/plain') {
+            content = await file.text();
+        } else {
+            content = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        const receiptObj = {
+            name: file.name,
+            size: file.size,
+            type: fileType,
+            fileObject: file,
+            content: content
+        };
+
+        if (this.dummyData[index]) {
+            this.dummyData[index].attachedReceipt = receiptObj;
+            window.SidePanelLog.log('p2 stage 1', `Attached receipt ${file.name} to claim ${this.dummyData[index].refNo}.`);
+            this.renderTable();
+        }
+    },
+
+    removeRowReceipt(index) {
+        // Save any ongoing user edits before re-rendering
+        this.saveChanges();
+
+        if (this.dummyData[index]) {
+            const claimRef = this.dummyData[index].refNo;
+            this.dummyData[index].attachedReceipt = null;
+            window.SidePanelLog.log('p2 stage 1', `Removed attached receipt from claim ${claimRef}.`);
+            this.renderTable();
+        }
+    },
+
+    async handleReceiptFilesSelect(fileList) {
+        const filesArray = Array.from(fileList);
+        for (const file of filesArray) {
+            let content = '';
+            let fileType = file.type || '';
+
+            if (file.name.endsWith('.pdf')) {
+                fileType = 'application/pdf';
+            } else if (file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
+                fileType = 'text/plain';
+            } else if (file.type.startsWith('image/')) {
+                fileType = 'image';
+            }
+
+            if (fileType === 'text/plain') {
+                content = await file.text();
+            } else {
+                content = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            this.receiptFiles.push({
+                name: file.name,
+                size: file.size,
+                type: fileType,
+                fileObject: file,
+                content: content,
+                isDefault: false
+            });
+
+            window.SidePanelLog.log('p2 stage 1', `Uploaded bulk supporting receipt document: ${file.name}`);
+        }
+
+        this.renderReceiptFiles();
+    },
+
+    removeReceiptFile(index) {
+        if (index >= 0 && index < this.receiptFiles.length) {
+            const removed = this.receiptFiles.splice(index, 1);
+            window.SidePanelLog.log('p2 stage 1', `Removed receipt document: ${removed[0]?.name}`);
+            this.renderReceiptFiles();
+        }
+    },
+
+    renderReceiptFiles() {
+        const container = document.getElementById('receiptFilesContainer');
+        if (!container) return;
+
+        if (this.receiptFiles.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1; padding: 16px;">
+                    <p class="text-muted"><i class="fa-solid fa-folder-open"></i> No additional bulk receipt documents uploaded yet.</p>
+                </div>`;
+            return;
+        }
+
+        let html = '';
+        this.receiptFiles.forEach((file, idx) => {
+            const isPdf = file.name.toLowerCase().endsWith('.pdf');
+            const isImg = file.type.startsWith('image') || file.name.match(/\.(png|jpg|jpeg|webp)$/i);
+            const iconClass = isPdf ? 'fa-file-pdf text-danger' : (isImg ? 'fa-file-image text-primary' : 'fa-file-lines text-success');
+            const sizeKb = file.size ? (file.size / 1024).toFixed(1) + ' KB' : 'Preset';
+
+            html += `
+                <div class="receipt-file-card" style="background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; display: flex; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 12px; overflow: hidden;">
+                        <i class="fa-solid ${iconClass}" style="font-size: 1.5rem;"></i>
+                        <div style="overflow: hidden;">
+                            <div class="font-bold" style="font-size: 0.9rem; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;" title="${file.name}">${file.name}</div>
+                            <span class="text-muted" style="font-size: 0.75rem;">${sizeKb}</span>
+                        </div>
+                    </div>
+                    <button class="btn-icon text-danger" onclick="window.Stage1ClaimsIngestion.removeReceiptFile(${idx})" title="Remove document" style="background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 4px 8px;">
+                        &times;
+                    </button>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    },
 
     renderTable(data = null) {
         if (data) this.dummyData = data;
@@ -77,21 +257,38 @@ window.Stage1ClaimsIngestion = {
                         <th>Comments</th>
                         <th>Receipt No</th>
                         <th>Receipt Date</th>
-                        <th>Receipt Amt</th>
                         <th>Claimable Amt</th>
                         <th>HOD Approval</th>
+                        <th>Attached Receipt</th>
                     </tr>
                 </thead>
                 <tbody>
         `;
 
         this.dummyData.forEach((row, index) => {
-            // Consistent accent badge for all group codes
             const badgeClass = 'badge-accent';
-
             const inputStyle = 'width: 100%; padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; background: transparent; font-family: inherit; font-size: inherit;';
             const numStyle = inputStyle + ' font-weight: bold; width: 80px;';
             const shortStyle = inputStyle + ' width: 100px;';
+
+            let attachedCell = '';
+            if (row.attachedReceipt) {
+                attachedCell = `
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="badge badge-accent" style="font-size: 0.75rem; white-space: nowrap; max-width: 130px; overflow: hidden; text-overflow: ellipsis;" title="${row.attachedReceipt.name}">
+                            <i class="fa-solid fa-file"></i> ${row.attachedReceipt.name}
+                        </span>
+                        <button class="btn-icon text-danger" onclick="window.Stage1ClaimsIngestion.removeRowReceipt(${index})" title="Remove receipt" style="background:none; border:none; cursor:pointer; font-weight:bold; padding: 2px 4px;">&times;</button>
+                    </div>
+                `;
+            } else {
+                attachedCell = `
+                    <button class="btn btn-sm btn-outline" onclick="document.getElementById('rowReceiptInput_${index}').click()" style="white-space: nowrap; padding: 4px 8px; font-size: 0.8rem;">
+                        <i class="fa-solid fa-paperclip"></i> Upload
+                    </button>
+                    <input type="file" id="rowReceiptInput_${index}" accept="image/*,.pdf,.txt,.csv" onchange="window.Stage1ClaimsIngestion.handleRowReceiptUpload(${index}, this.files)" style="display: none;">
+                `;
+            }
 
             tableHtml += `
                 <tr data-index="${index}">
@@ -101,7 +298,6 @@ window.Stage1ClaimsIngestion = {
                     <td><input type="text" class="claim-input" data-field="templateName" style="${inputStyle}" value="${row.templateName}"></td>
                     <td><input type="text" class="claim-input doc-tag" data-field="receiptNo" style="border:none; padding:4px;" value="${row.receiptNo}"></td>
                     <td><input type="text" class="claim-input" data-field="receiptDate" style="${shortStyle}" value="${row.receiptDate}"></td>
-                    <td><input type="text" class="claim-input" data-field="receiptAmt" style="${numStyle}" value="${row.receiptAmt}"></td>
                     <td><input type="text" class="claim-input text-verified" data-field="claimAmt" style="${numStyle} border:none; background: transparent;" value="${row.claimAmt}"></td>
                     <td>
                         <select class="claim-input" data-field="hodApproval" style="${inputStyle} width: 120px;">
@@ -110,6 +306,7 @@ window.Stage1ClaimsIngestion = {
                             <option value="Not Approved" ${row.hodApproval === 'Not Approved' ? 'selected' : ''}>Not Approved</option>
                         </select>
                     </td>
+                    <td style="vertical-align: middle;">${attachedCell}</td>
                 </tr>
             `;
         });
@@ -120,6 +317,21 @@ window.Stage1ClaimsIngestion = {
         `;
 
         container.innerHTML = tableHtml;
+
+        // Auto-sync any typed edits or dropdown selections in real time
+        container.querySelectorAll('.claim-input').forEach(input => {
+            const eventName = input.tagName === 'SELECT' ? 'change' : 'input';
+            input.addEventListener(eventName, (e) => {
+                const tr = e.target.closest('tr');
+                if (!tr) return;
+                const index = tr.getAttribute('data-index');
+                const field = e.target.getAttribute('data-field');
+                if (this.dummyData[index] && field) {
+                    this.dummyData[index][field] = e.target.value;
+                }
+            });
+        });
+
         window.SidePanelLog.log('p2 stage 1', 'Ingested 5 editable claim records.');
     },
 
