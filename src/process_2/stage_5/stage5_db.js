@@ -1,9 +1,9 @@
 /**
- * Stage 4: Local SQL Database Integration Module
+ * Stage 5: Local SQL Database Integration Module
  * Mimics committing approved claims to SQL DB.
  */
 
-window.Stage4Database = {
+window.Stage5Database = {
     apiEndpoint: '/api/p2/records',
     dbKey: 'local_sql_claims_db',
 
@@ -14,7 +14,7 @@ window.Stage4Database = {
     async clearDatabaseRecords() {
         try {
             await fetch(this.apiEndpoint, { method: 'DELETE' });
-            window.SidePanelLog.log('p2 stage 4', 'SQL database table cleared in SQLite.');
+            window.SidePanelLog.log('p2 stage 5', 'SQL database table cleared in SQLite.');
         } catch (e) {
             console.warn('API clear failed, falling back to localStorage:', e);
             localStorage.setItem(this.dbKey, JSON.stringify([]));
@@ -24,7 +24,7 @@ window.Stage4Database = {
 
     async pushToDatabase(claims, aiDecisions, glMappings) {
         if (!claims || !aiDecisions || !glMappings) {
-            window.SidePanelLog.log('p2 stage 4', 'Missing data. Cannot push to DB.');
+            window.SidePanelLog.log('p2 stage 5', 'Missing data. Cannot push to DB.');
             return false;
         }
 
@@ -35,14 +35,14 @@ window.Stage4Database = {
             
             // Strict gate: Only push Approved claims
             if (decision !== 'Approved') {
-                window.SidePanelLog.log('p2 stage 4', `Skipping ${claim.refNo} (Status: ${decision}).`);
+                window.SidePanelLog.log('p2 stage 5', `Skipping ${claim.refNo} (Status: ${decision}).`);
                 continue; 
             }
 
             const glCode = glMappings[claim.groupCode] || 'UNMAPPED';
             
             if (glCode === 'MANUAL') {
-                window.SidePanelLog.log('p2 stage 4', `Skipping ${claim.refNo} due to missing GL mapping.`);
+                window.SidePanelLog.log('p2 stage 5', `Skipping ${claim.refNo} due to missing GL mapping.`);
                 continue;
             }
 
@@ -76,13 +76,13 @@ window.Stage4Database = {
             }
         }
 
-        window.SidePanelLog.log('p2 stage 4', `Successfully pushed ${pushedCount} approved claims to SQL database.`);
+        window.SidePanelLog.log('p2 stage 5', `Successfully pushed ${pushedCount} approved claims to SQL database.`);
         this.renderDatabaseViewer();
         return true;
     },
 
     async renderDatabaseViewer() {
-        const tableContainer = document.getElementById('stage4Content');
+        const tableContainer = document.getElementById('stage5Content');
         if (!tableContainer) return;
 
         let records = [];
@@ -111,7 +111,7 @@ window.Stage4Database = {
 
         let html = `
             <div style="margin-bottom: 12px; text-align: right;">
-                <button class="btn btn-outline" onclick="window.Stage4Database.clearDatabaseRecords()">Clear DB</button>
+                <button class="btn btn-outline" onclick="window.Stage5Database.clearDatabaseRecords()">Clear DB</button>
             </div>
             <table class="sql-db-table">
                 <thead>

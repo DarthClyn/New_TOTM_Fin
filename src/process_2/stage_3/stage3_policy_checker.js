@@ -3,9 +3,10 @@
  * Evaluates each claim row against the user-defined policy.
  */
 
-window.Stage2PolicyChecker = {
+window.Stage3PolicyChecker = {
     systemPrompt: `You are an AI Finance Policy Auditor.
 Your job is to evaluate a list of employee claims against a specific corporate policy.
+For each claim, check if it complies with the policy rules based solely on the provided claim data.
 You must output a strictly valid JSON array. Each object in the array represents your decision for a claim.
 Required JSON format:
 [
@@ -17,7 +18,7 @@ Required JSON format:
 ]`,
 
     async run(claims, policyText) {
-        const container = document.getElementById('stage2Content');
+        const container = document.getElementById('stage3Content');
         container.innerHTML = '<div class="empty-state"><p><i class="fa-solid fa-spinner fa-spin"></i> AI is evaluating policies...</p></div>';
 
         const activeApiKey = localStorage.getItem('openRouterApiKey');
@@ -78,7 +79,7 @@ Evaluate each claim according to the policy. Return ONLY the JSON array.
         } catch (err) {
             console.error('AI Policy Check Error:', err);
             container.innerHTML = `<div class="empty-state text-danger"><p>AI Policy Check Failed: ${err.message}</p></div>`;
-            window.SidePanelLog.log('p2 stage 2', 'AI Policy Check failed: ' + err.message);
+            window.SidePanelLog.log('p2 stage 3', 'AI Policy Check failed: ' + err.message);
             return null;
         }
     },
@@ -93,6 +94,7 @@ Evaluate each claim according to the policy. Return ONLY the JSON array.
                         <th>HOD Approval</th>
                         <th>AI Decision</th>
                         <th>AI Reasoning</th>
+                        <th>Human Review Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -112,11 +114,43 @@ Evaluate each claim according to the policy. Return ONLY the JSON array.
                     <td>${original.hodApproval || 'N/A'}</td>
                     <td><span class="badge ${badgeClass}">${res.decision}</span></td>
                     <td class="text-muted" style="font-size: 0.9em; max-width: 300px;">${res.reasoning}</td>
+                    <td>
+                        ${res.decision !== 'Approved' ? `
+                            <button class="btn btn-primary" style="font-size: 0.8rem; padding: 4px 8px;" onclick="window.Stage3PolicyChecker.overrideClaim(this, '${res.refNo}')"><i class="fa-solid fa-pen-to-square"></i> Override & Approve</button>
+                        ` : '<span class="text-muted" style="font-size: 0.85rem;"><i class="fa-solid fa-check"></i> Auto-Verified</span>'}
+                    </td>
                 </tr>
             `;
         });
 
         tableHtml += `</tbody></table>`;
-        document.getElementById('stage2Content').innerHTML = tableHtml;
+        document.getElementById('stage3Content').innerHTML = tableHtml;
+    },
+
+    overrideClaim(btn, refNo) {
+        // Find the row and update UI
+        const tr = btn.closest('tr');
+        const badge = tr.querySelector('.badge-discrepancy') || tr.querySelector('.badge-partial');
+        if (badge) {
+            badge.className = 'badge badge-match';
+            badge.textContent = 'Approved (Manual)';
+        }
+        
+        const actionTd = btn.closest('td');
+        actionTd.innerHTML = '<span class="text-verified" style="font-size: 0.85rem;"><i class="fa-solid fa-user-check"></i> Human Approved</span>';
+
+        // Update the underlying state
+        const aiState = window.aiDecisionsState || window.Stage3PolicyChecker.lastResults;
+        if (aiState) {
+            const claimRes = aiState.find(r => r.refNo === refNo);
+            if (claimRes) {
+                claimRes.decision = 'Approved';
+                claimRes.reasoning = claimRes.reasoning + ' [OVERRIDDEN BY HUMAN]';
+            }
+        }
+        window.SidePanelLog.log('p2 stage 2', `Human overridden and approved claim: ${refNo}`);
+        
+        // Check if all are resolved to auto-push
+        if (window._stage3AutoPushCheck) window._stage3AutoPushCheck();
     }
 };

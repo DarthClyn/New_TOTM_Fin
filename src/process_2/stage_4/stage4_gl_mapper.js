@@ -1,9 +1,9 @@
 /**
- * Stage 3: GL Code Mapper
+ * Stage 4: GL Code Mapper
  * Uses AI to map Claim Group Codes to valid GL Codes based on a dictionary.
  */
 
-window.Stage3GLMapper = {
+window.Stage4GLMapper = {
     // Full Chart of Accounts
     sqlDictionary: {
             "11010103": "FURNITURE & FITTINGS",
@@ -509,9 +509,9 @@ Example: { "ENTERT": "78050200", "MEAL": "78050200", "UNKNOWN": "MANUAL" }`,
 
         // Pass this.claimCodeMapping so they show as 'Mapped' instead of 'AI Resolved' on load
         this.renderMappingTable(allGroups, finalMappings, this.claimCodeMapping);
-        window.SidePanelLog.log('p2 stage 3', `Default GL mapping loaded: ${allGroups.length} claim group codes pre-mapped from hardcoded table.`);
-        document.getElementById('stage3Status').textContent = 'Default Ready';
-        document.getElementById('stage3Status').className = 'badge badge-match';
+        window.SidePanelLog.log('p2 stage 4', `Default GL mapping loaded: ${allGroups.length} claim group codes pre-mapped from hardcoded table.`);
+        document.getElementById('stage4Status').textContent = 'Default Ready';
+        document.getElementById('stage4Status').className = 'badge badge-match';
     },
 
     // Run: Check current claims for any NEW unknown codes, call AI only for those
@@ -545,15 +545,15 @@ Example: { "ENTERT": "78050200", "MEAL": "78050200", "UNKNOWN": "MANUAL" }`,
         });
 
         const knownCount = allGroups.length - aiNeededFor.length;
-        window.SidePanelLog.log('p2 stage 3', `[PART 1 - Hardcoded] ${knownCount} claim codes instantly mapped from pre-defined GL table. No AI required.`);
+        window.SidePanelLog.log('p2 stage 4', `[PART 1 - Hardcoded] ${knownCount} claim codes instantly mapped from pre-defined GL table. No AI required.`);
 
         // Step 3: AI fallback ONLY for unknown codes
         if (aiNeededFor.length > 0) {
-            window.SidePanelLog.log('p2 stage 3', `[PART 2 - AI Fallback] ${aiNeededFor.length} new/unknown codes detected: ${aiNeededFor.map(g => g.code).join(', ')}. Calling AI...`);
+            window.SidePanelLog.log('p2 stage 4', `[PART 2 - AI Fallback] ${aiNeededFor.length} new/unknown codes detected: ${aiNeededFor.map(g => g.code).join(', ')}. Calling AI...`);
             const activeApiKey = localStorage.getItem('openRouterApiKey');
             if (!activeApiKey) {
                 aiNeededFor.forEach(g => { finalMappings[g.code] = 'MANUAL'; });
-                window.SidePanelLog.log('p2 stage 3', `[PART 2 - AI Fallback] No API key \u2014 ${aiNeededFor.length} codes marked MANUAL (Human Intervention).`);
+                window.SidePanelLog.log('p2 stage 4', `[PART 2 - AI Fallback] No API key \u2014 ${aiNeededFor.length} codes marked MANUAL (Human Intervention).`);
             } else {
                 try {
                     const userPrompt = `Available GL Codes:\n${JSON.stringify(this.glDictionary, null, 2)}\n\nNew Unknown Claim Groups:\n${JSON.stringify(aiNeededFor, null, 2)}\n\nReturn ONLY a valid JSON object.`;
@@ -583,18 +583,18 @@ Example: { "ENTERT": "78050200", "MEAL": "78050200", "UNKNOWN": "MANUAL" }`,
                     const jsonStr = data.choices[0].message.content.replace(/```json/g, '').replace(/```/g, '').trim();
                     const aiMappings = JSON.parse(jsonStr);
                     Object.assign(finalMappings, aiMappings);
-                    window.SidePanelLog.log('p2 stage 3', `[PART 2 - AI Fallback] AI resolved ${Object.keys(aiMappings).length} codes: ${Object.entries(aiMappings).map(([k, v]) => k + '\u2192' + v).join(', ')}.`);
+                    window.SidePanelLog.log('p2 stage 4', `[PART 2 - AI Fallback] AI resolved ${Object.keys(aiMappings).length} codes: ${Object.entries(aiMappings).map(([k, v]) => k + '\u2192' + v).join(', ')}.`);
                 } catch (err) {
                     aiNeededFor.forEach(g => { finalMappings[g.code] = 'MANUAL'; });
-                    window.SidePanelLog.log('p2 stage 3', `[PART 2 - AI Fallback] AI failed: ${err.message}. Codes marked MANUAL.`);
+                    window.SidePanelLog.log('p2 stage 4', `[PART 2 - AI Fallback] AI failed: ${err.message}. Codes marked MANUAL.`);
                 }
             }
         } else {
-            window.SidePanelLog.log('p2 stage 3', '[PART 2 - AI Fallback] Not needed \u2014 all claim codes matched in pre-defined table.');
+            window.SidePanelLog.log('p2 stage 4', '[PART 2 - AI Fallback] Not needed \u2014 all claim codes matched in pre-defined table.');
         }
 
         this.renderMappingTable(allGroups, finalMappings, this.claimCodeMapping);
-        window.SidePanelLog.log('p2 stage 3', `Complete: ${knownCount} hardcoded + ${aiNeededFor.length} AI-resolved = ${allGroups.length} total mapped.`);
+        window.SidePanelLog.log('p2 stage 4', `Complete: ${knownCount} hardcoded + ${aiNeededFor.length} AI-resolved = ${allGroups.length} total mapped.`);
         return this.getFinalMappings.bind(this);
     },
 
@@ -637,7 +637,7 @@ Example: { "ENTERT": "78050200", "MEAL": "78050200", "UNKNOWN": "MANUAL" }`,
             // Human Required rows get a Save button to confirm the manual selection
             const actionCell = isManual
                 ? `<span class="badge badge-discrepancy" style="font-size:0.75em; margin-right:8px;">Human Required</span>
-                   <button class="btn btn-success btn-sm gl-save-btn" onclick="window.Stage3GLMapper.saveManualMapping('${group.code}', this)" style="padding: 4px 10px; font-size: 0.8rem;">
+                   <button class="btn btn-success btn-sm gl-save-btn" onclick="window.Stage4GLMapper.saveManualMapping('${group.code}', this)" style="padding: 4px 10px; font-size: 0.8rem;">
                        <i class="fa-solid fa-floppy-disk"></i> Save
                    </button>`
                 : sourceBadge;
@@ -657,7 +657,7 @@ Example: { "ENTERT": "78050200", "MEAL": "78050200", "UNKNOWN": "MANUAL" }`,
         });
 
         tableHtml += `</tbody></table>`;
-        document.getElementById('stage3Content').innerHTML = tableHtml;
+        document.getElementById('stage4Content').innerHTML = tableHtml;
     },
 
     saveManualMapping(groupCode, btnEl) {
@@ -681,12 +681,10 @@ Example: { "ENTERT": "78050200", "MEAL": "78050200", "UNKNOWN": "MANUAL" }`,
         }
 
         const glDesc = this.glDictionary[selectedGl] || selectedGl;
-        window.SidePanelLog.log('p2 stage 3', `[Human Intervention] ${groupCode} → ${selectedGl} - ${glDesc} saved.`);
+        window.SidePanelLog.log('p2 stage 4', `[Human Intervention] ${groupCode} → ${selectedGl} - ${glDesc} saved.`);
 
         // If pipeline was waiting for human reviews, check if all are now resolved
-        if (typeof window._stage3AutoPushCheck === 'function') {
-            window._stage3AutoPushCheck();
-        }
+        if (window._stage4AutoPushCheck) window._stage4AutoPushCheck();
     },
 
 
