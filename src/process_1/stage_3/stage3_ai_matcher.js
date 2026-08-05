@@ -12,23 +12,24 @@
 window.Stage3AiMatcher = {
     fixedModel: 'nvidia/nemotron-3-super-120b-a12b:free',
 
-    systemPrompt: `You are an expert Enterprise Audit & Invoice Matching AI.
-Perform a strict 2-Way / 3-Way / 4-Way match between extracted Invoice Key-Values and Supporting Documents (Purchase Order, Delivery Order, Contract Agreement).
+    systemPrompt: `You are an expert Enterprise Audit & Invoice Matching AI acting for TOTM (TOTM Labs / TOTM Technologies / TOTM Group).
+All incoming invoices are billed TO TOTM from external vendors (never FROM TOTM).
 
-STRICT VERIFICATION & OCR NORMALIZATION RULES:
-1. OCR AMBIGUITY NORMALIZATION: Common OCR character confusions MUST NOT be flagged as discrepancies. Automatically normalize:
-   - Digit '0' vs Letter 'O' / 'o' (e.g. DO-2026-001 vs D0-2026-001)
-   - Digit '1' vs Letter 'I' / 'i' / 'l' (e.g. I500 vs 1500)
-   - Currency symbol vs letter shapes (e.g. 'saD' or 'Sgd' vs 'SGD')
-   If the ONLY difference is an OCR character confusion, mark status as "MATCHED" with a note "OCR Auto-Corrected".
-2. SPELLING & VENDOR VERIFICATION: Check vendor names and line items for exact spelling matches.
-3. DECIMAL ACCURACY: Compare prices, subtotals, tax, and totals up to exact decimal precision.
-4. DO NOT OUTPUT ABSENT FIELDS: Only evaluate fields present in extracted invoice data or supporting documents.
+Perform a 2-Way / 3-Way / 4-Way match between extracted Invoice Key-Values and Supporting Documents (Purchase Order, Delivery Order, Contract Agreement, Quotation).
 
+GENERAL BUSINESS AUDIT & MATCHING PRINCIPLES:
+1. PRIOR DOCUMENT METADATA LOGIC: Prior supporting documents (Contracts, POs, DOs, Quotations) are executed BEFORE an invoice is generated. They naturally will NOT contain 'invoice_number', 'invoice_date', or 'due_date'. NEVER flag 'invoice_number', 'invoice_date', or 'due_date' as DISCREPANCIES simply because they are absent from prior supporting documents. Mark them as MATCHED or NOT_APPLICABLE.
+2. SERVICE & LUMP-SUM CONTRACT LOGIC: Service agreements, monthly maintenance contracts, or lump-sum scope agreements state overall service charges or total amounts rather than per-unit itemized prices ('unit_price'). If the invoice total_amount matches the contract agreement or quotation, do NOT flag missing 'unit_price' or description text variations as DISCREPANCIES.
+3. ENTITY DIRECTION: TOTM is ALWAYS the buyer/client (Bill To). External vendors are the suppliers (Issued By).
+4. FOCUS DISCREPANCIES ON GENUINE CONFLICTS: Only flag a field as "DISCREPANCY" if there is an ACTUAL BUSINESS CONFLICT (e.g., invoice total exceeds PO/contract price, vendor name is a completely different company, line item amount is mathematically wrong).
+5. OCR AMBIGUITY NORMALIZATION: Common OCR character confusions (0 vs O, 1 vs I/l, SGD vs S$ vs saD) MUST NOT be flagged as discrepancies. Automatically normalize them and mark status as "MATCHED" with note "OCR Auto-Corrected".
+6. DECIMAL ACCURACY: Compare prices, subtotals, tax, and totals up to exact decimal precision.
+7. DO NOT OUTPUT ABSENT FIELDS: Only evaluate fields present in extracted invoice data or supporting documents.
+8. IF a field is not presnet in availble data, not verifed but still dont mark descrepancy 
 Output ONLY valid JSON:
 {
   "overall_status": "MATCHED" | "DISCREPANCY_FOUND",
-  "match_summary": "Summary of audit results",
+  "match_summary": "Summary of audit results focusing on genuine business discrepancies",
   "match_results": [
     {
       "field_name": "Invoice Field Name",
@@ -36,18 +37,15 @@ Output ONLY valid JSON:
       "supporting_doc_source": "AGR.txt / PO.txt / DO.txt",
       "supporting_doc_value": "Matched Value from Supporting Doc",
       "status": "MATCHED" | "DISCREPANCY" | "PARTIAL_MATCH",
-      "verification_notes": "Detailed notes"
+      "verification_notes": "Detailed notes explaining verification"
     }
   ]
 }`,
 
-    recheckerSystemPrompt: `You are an AI Re-Checker Inspector.
+    recheckerSystemPrompt: `You are an AI Re-Checker Inspector acting for TOTM.
 Your job is to audit suspected discrepancies flagged during OCR invoice matching.
-Determine if the discrepancy is due to an OCR reading error or if it is a genuine business discrepancy.
-If it is an OCR reading error or character shape confusion (0 vs O, 1 vs I, etc.), correct status to MATCHED.
-CRITICAL NUMERICAL RULES:
-- DO NOT excuse or auto-correct numerical differences by assuming a missing decimal point, typo in digits, or rounding off.
-- ANY difference in monetary amounts, quantities, or prices must be kept as a DISCREPANCY, even if it is close or looks like a missing decimal. Numbers must be strictly accountable.
+1. PRIOR DOC & SERVICE CONTRACT RE-CHECK: If a discrepancy was flagged for fields that prior documents naturally do not contain (e.g. invoice_number, invoice_date, due_date, or unit_price for lump-sum service contracts), or if it is an OCR character confusion (0 vs O, 1 vs I, SGD vs S$), CORRECT status to MATCHED.
+2. Keep status as DISCREPANCY ONLY if there is a genuine monetary or quantitative mismatch (e.g. invoice total exceeds contract price, different vendor company, wrong quantity).
 Output valid JSON:
 {
   "verified_status": "MATCHED" | "DISCREPANCY",
@@ -255,37 +253,35 @@ Output valid JSON:
                 tableContainer.innerHTML = '<div class="empty-state"><p>No relevant matching fields found.</p></div>';
             } else {
                 let tableHtml = `
-                    <table class="match-data-table">
-                        <thead>
-                            <tr>
-                                <th>Invoice Field</th>
-                                <th>Invoice Extracted Value</th>
-                                <th>Supporting Doc Source</th>
-                                <th>Supporting Doc Value</th>
-                                <th>Match Status</th>
-                                <th>Verification Notes</th>
-                                <th>Human Review Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${filteredResults.map((row, idx) => {
-                    let badgeClass = 'badge-match';
-                    if (row.status === 'DISCREPANCY') badgeClass = 'badge-discrepancy';
-                    else if (row.status === 'PARTIAL_MATCH') badgeClass = 'badge-partial';
+                    <div style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color); border-radius: 8px; background: #ffffff;">
+                        <table class="match-data-table" style="width: 100%; min-width: 1250px; table-layout: auto;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 14%;">Invoice Field</th>
+                                    <th style="width: 18%;">Invoice Extracted Value</th>
+                                    <th style="width: 10%;">Supporting Doc Source</th>
+                                    <th style="width: 20%;">Supporting Doc Value</th>
+                                    <th style="width: 10%;">Match Status</th>
+                                    <th style="width: 18%;">Verification Notes</th>
+                                    <th style="width: 10%; text-align: center;">Human Review Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${filteredResults.map((row, idx) => {
+                        let badgeClass = 'badge-match';
+                        if (row.status === 'DISCREPANCY' || row.status === 'REJECTED') badgeClass = 'badge-discrepancy';
+                        else if (row.status === 'PARTIAL_MATCH') badgeClass = 'badge-partial';
 
-                    const isMatched = row.status === 'MATCHED';
-
-                    return `
-                                    <tr>
-                                        <td class="font-bold">${row.field_name || '-'}</td>
-                                        <td id="inv_val_${idx}">${typeof row.invoice_value === 'object' ? JSON.stringify(row.invoice_value) : (row.invoice_value ?? '-')}</td>
-                                        <td><span class="doc-tag">${row.supporting_doc_source || 'N/A'}</span></td>
-                                        <td>${typeof row.supporting_doc_value === 'object' ? JSON.stringify(row.supporting_doc_value) : (row.supporting_doc_value ?? '-')}</td>
-                                        <td><span class="badge ${badgeClass}" id="status_badge_${idx}">${row.status || 'MATCHED'}</span></td>
-                                        <td class="text-sm-notes">${row.verification_notes || '-'}</td>
-                                        <td id="action_cell_${idx}">
-                                            ${isMatched ? '<span class="text-verified"><i class="fa-solid fa-check"></i> Verified</span>' : `
-                                                <div class="action-shortcut-group">
+                        return `
+                                        <tr>
+                                            <td class="font-bold">${row.field_name || '-'}</td>
+                                            <td id="inv_val_${idx}">${typeof row.invoice_value === 'object' ? JSON.stringify(row.invoice_value) : (row.invoice_value ?? '-')}</td>
+                                            <td><span class="doc-tag">${row.supporting_doc_source || 'N/A'}</span></td>
+                                            <td>${typeof row.supporting_doc_value === 'object' ? JSON.stringify(row.supporting_doc_value) : (row.supporting_doc_value ?? '-')}</td>
+                                            <td><span class="badge ${badgeClass}" id="status_badge_${idx}">${row.status || 'MATCHED'}</span></td>
+                                            <td class="text-sm-notes">${row.verification_notes || '-'}</td>
+                                            <td id="action_cell_${idx}">
+                                                <div class="action-shortcut-group" style="display: flex; gap: 4px; justify-content: center; align-items: center;">
                                                     <button class="btn btn-xs btn-success" onclick="window.Stage3AiMatcher.quickApproveRow(${idx})" title="Quick Approve">
                                                         <i class="fa-solid fa-check"></i>
                                                     </button>
@@ -296,13 +292,13 @@ Output valid JSON:
                                                         <i class="fa-solid fa-eye"></i> View Review
                                                     </button>
                                                 </div>
-                                            `}
-                                        </td>
-                                    </tr>
-                                `;
-                }).join('')}
-                        </tbody>
-                    </table>
+                                            </td>
+                                        </tr>
+                                    `;
+                    }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 `;
                 tableContainer.innerHTML = tableHtml;
             }
@@ -336,17 +332,12 @@ Output valid JSON:
         if (!this.matchData || !this.matchData.match_results[index]) return;
         const row = this.matchData.match_results[index];
         row.status = 'MATCHED';
-        row.verification_notes += ' [Approved by Human Auditor]';
+        row.verification_notes += ' [Approved by Auditor]';
 
         const badge = document.getElementById(`status_badge_${index}`);
         if (badge) {
             badge.className = 'badge badge-match';
             badge.textContent = 'MATCHED';
-        }
-
-        const actionCell = document.getElementById(`action_cell_${index}`);
-        if (actionCell) {
-            actionCell.innerHTML = '<span class="text-verified"><i class="fa-solid fa-check"></i> Verified</span>';
         }
 
         window.SidePanelLog.log('human approval', `human approval approved for field '${row.field_name}'`);
@@ -426,11 +417,6 @@ Output valid JSON:
 
             const invValTd = document.getElementById(`inv_val_${index}`);
             if (invValTd) invValTd.textContent = newInvoiceVal;
-
-            const actionCell = document.getElementById(`action_cell_${index}`);
-            if (actionCell) {
-                actionCell.innerHTML = '<span class="text-verified"><i class="fa-solid fa-check"></i> Verified</span>';
-            }
 
             modal.classList.add('hidden');
             window.SidePanelLog.log('human approval', `human approval overridden & approved for field '${row.field_name}' to '${newInvoiceVal}'`);

@@ -1,7 +1,8 @@
 /**
  * Stage 2: OCR & AI Extractor Module
- * Performs OCR conversion (Tesseract.js) and OpenRouter AI Key Mapping
- * Using fixed model: nvidia/nemotron-3-super-120b-a12b:free
+ * Performs direct text extraction for text-selectable PDFs & text files (bypassing OCR),
+ * and uses Tesseract.js OCR for scanned PDFs & image files.
+ * Uses fixed model: nvidia/nemotron-3-super-120b-a12b:free
  * Extracts ONLY fields belonging to the Main Invoice Document
  */
 
@@ -15,7 +16,7 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
 2. DO NOT EXTRACT SUPPORTING DOC FIELDS: Do NOT extract fields belonging to contract agreements, delivery orders, or purchase orders. Focus strictly on the invoice itself.
 3. DO NOT INCLUDE MISSING FIELDS: If a field is missing, omit it completely from JSON output. Do NOT output null, "N/A", or empty values.
 4. SYNONYM MAPPING: Map keys smartly to clean snake_case identifiers.
-5. Output ONLY valid JSON without markdown wrapping.`,
+5. OUTPUT ONLY VALID RAW JSON: Output ONLY a raw valid JSON object starting with '{' and ending with '}' without any markdown, codeblocks, introductory, or conversational text.`,
 
     extractedOcrText: '',
     extractedData: null,
@@ -35,14 +36,14 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
 
         if (startOcrBtn) startOcrBtn.disabled = true;
         if (ocrProgress) ocrProgress.classList.remove('hidden');
-        if (ocrProgressStatus) ocrProgressStatus.textContent = 'Initializing Tesseract OCR engine...';
+        if (ocrProgressStatus) ocrProgressStatus.textContent = 'Initializing document reader...';
         if (ocrProgressBar) ocrProgressBar.style.width = '10%';
         if (ocrProgressPercent) ocrProgressPercent.textContent = '10%';
 
-        window.SidePanelLog.log('p1 stage 2', 'Started OCR conversion...');
+        window.SidePanelLog.log('p1 stage 2', 'Started document processing...');
 
         try {
-            // Text files (.txt, .csv)
+            // 1. Text files (.txt, .csv)
             if (file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
                 this.extractedOcrText = await file.text();
                 if (ocrProgressBar) ocrProgressBar.style.width = '100%';
@@ -50,11 +51,50 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
                 if (ocrProgressStatus) ocrProgressStatus.textContent = 'Text file loaded directly!';
                 setTimeout(() => ocrProgress && ocrProgress.classList.add('hidden'), 1000);
                 if (startOcrBtn) startOcrBtn.disabled = false;
-                window.SidePanelLog.log('p1 stage 2', 'Started and Python/Text OCR extraction done');
+                window.SidePanelLog.log('p1 stage 2', 'Text file loaded directly (bypassed OCR).');
                 return;
             }
 
-            // PDF Documents
+            // 2. PDF Documents: Check if text-selectable first
+            if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+                if (ocrProgressStatus) ocrProgressStatus.textContent = 'Checking PDF for selectable text...';
+                try {
+                    if (window.pdfjsLib) {
+                        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+                        const arrayBuffer = await file.arrayBuffer();
+                        const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+                        const pdf = await loadingTask.promise;
+                        let textContentAll = '';
+
+                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                            const page = await pdf.getPage(pageNum);
+                            const textContent = await page.getTextContent();
+                            const pageText = textContent.items.map(item => item.str).join(' ');
+                            textContentAll += pageText + '\n';
+                        }
+
+                        textContentAll = textContentAll.trim();
+
+                        // If PDF contains selectable text (not a scanned image)
+                        if (textContentAll && textContentAll.length > 20) {
+                            this.extractedOcrText = textContentAll;
+                            if (ocrProgressBar) ocrProgressBar.style.width = '100%';
+                            if (ocrProgressPercent) ocrProgressPercent.textContent = '100%';
+                            if (ocrProgressStatus) ocrProgressStatus.textContent = 'Text-selectable PDF loaded directly (Skipped OCR)!';
+                            setTimeout(() => ocrProgress && ocrProgress.classList.add('hidden'), 1000);
+                            if (startOcrBtn) startOcrBtn.disabled = false;
+                            window.SidePanelLog.log('p1 stage 2', `Text-selectable PDF detected (${textContentAll.length} chars). Bypassed OCR engine & ready for AI extraction.`);
+                            return;
+                        }
+                    }
+                } catch (pdfErr) {
+                    console.warn('PDF.js direct text extraction error, falling back to OCR:', pdfErr);
+                }
+            }
+
+            // 3. Scanned PDF or Image Documents: Fallback to Tesseract OCR
+            if (ocrProgressStatus) ocrProgressStatus.textContent = 'Scanned document detected. Running Tesseract OCR...';
+
             let ocrInput = file;
             if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
                 const pdfCanvas = document.getElementById('pdfCanvas');
@@ -69,7 +109,7 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
                         const pct = Math.min(99, Math.max(10, Math.round((m.progress || 0.1) * 100)));
                         if (ocrProgressBar) ocrProgressBar.style.width = `${pct}%`;
                         if (ocrProgressPercent) ocrProgressPercent.textContent = `${pct}%`;
-                        if (ocrProgressStatus) ocrProgressStatus.textContent = `Extracting Text (${pct}%)...`;
+                        if (ocrProgressStatus) ocrProgressStatus.textContent = `Extracting Text via Tesseract OCR (${pct}%)...`;
                     }
                 }
             });
@@ -83,13 +123,13 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
             if (ocrProgressStatus) ocrProgressStatus.textContent = 'OCR Completed!';
             setTimeout(() => ocrProgress && ocrProgress.classList.add('hidden'), 1200);
 
-            window.SidePanelLog.log('p1 stage 2', 'Started and Tesseract OCR extraction done');
+            window.SidePanelLog.log('p1 stage 2', 'Tesseract OCR extraction done.');
 
         } catch (err) {
             console.error('OCR Error:', err);
-            window.SidePanelLog.log('p1 stage 2', 'OCR extraction failed: ' + err.message);
-            if (ocrProgressStatus) ocrProgressStatus.textContent = 'OCR Failed';
-            alert('Failed to run OCR: ' + err.message);
+            window.SidePanelLog.log('p1 stage 2', 'Document extraction failed: ' + err.message);
+            if (ocrProgressStatus) ocrProgressStatus.textContent = 'Extraction Failed';
+            alert('Failed to process document: ' + err.message);
         } finally {
             if (startOcrBtn) startOcrBtn.disabled = false;
         }
@@ -181,7 +221,12 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
 
     renderResults(rawContent) {
         let cleanJson = rawContent;
-        if (cleanJson.includes('```')) {
+        const firstBrace = cleanJson.indexOf('{');
+        const lastBrace = cleanJson.lastIndexOf('}');
+
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+            cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
+        } else if (cleanJson.includes('```')) {
             cleanJson = cleanJson.replace(/```json/gi, '').replace(/```/g, '').trim();
         }
 

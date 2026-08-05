@@ -115,12 +115,17 @@ window.Stage1DocumentSelector = {
         }
     },
 
-    async handleCustomContextFilesUpload(filesList) {
-        const filesArray = Array.from(filesList);
-        for (const file of filesArray) {
-            let text = '';
-            if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-                try {
+    async extractTextFromSupportingFile(file) {
+        // 1. Text files (.txt, .csv)
+        if (file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.csv')) {
+            return await file.text();
+        }
+
+        // 2. PDF Documents: Check if text-selectable first
+        if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+            try {
+                if (window.pdfjsLib) {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
                     const fileArrayBuffer = await file.arrayBuffer();
                     const pdf = await window.pdfjsLib.getDocument({ data: fileArrayBuffer }).promise;
                     let fullText = '';
@@ -129,14 +134,68 @@ window.Stage1DocumentSelector = {
                         const content = await page.getTextContent();
                         fullText += content.items.map(item => item.str).join(' ') + '\n';
                     }
-                    text = fullText;
-                } catch(e) {
-                    console.error("PDF extraction failed", e);
-                    text = await file.text();
+
+                    fullText = fullText.trim();
+                    if (fullText && fullText.length > 20) {
+                        window.SidePanelLog.log('p1 stage 1', `Text-selectable PDF supporting doc loaded directly: ${file.name} (${fullText.length} chars).`);
+                        return fullText;
+                    }
+
+                    // Non-selectable / Scanned PDF -> Render canvas & run Tesseract OCR
+                    window.SidePanelLog.log('p1 stage 1', `Scanned non-selectable PDF detected for supporting doc ${file.name}. Running Tesseract OCR...`);
+                    const page = await pdf.getPage(1);
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+
+                    if (window.Tesseract) {
+                        const worker = await window.Tesseract.createWorker('eng');
+                        const ret = await worker.recognize(canvas);
+                        await worker.terminate();
+                        const ocrText = ret.data.text.trim();
+                        window.SidePanelLog.log('p1 stage 1', `Tesseract OCR completed for scanned PDF supporting doc: ${file.name} (${ocrText.length} chars).`);
+                        return ocrText || `[Scanned PDF: ${file.name}]`;
+                    }
                 }
-            } else {
-                text = await file.text();
+            } catch (pdfErr) {
+                console.warn("PDF extraction/OCR failed for supporting doc:", pdfErr);
             }
+        }
+
+        // 3. Image Files (.png, .jpg, .jpeg) -> Tesseract OCR
+        if (file.type.startsWith('image/') || file.name.match(/\.(png|jpg|jpeg|webp)$/i)) {
+            try {
+                if (window.Tesseract) {
+                    window.SidePanelLog.log('p1 stage 1', `Running Tesseract OCR on supporting image: ${file.name}...`);
+                    const worker = await window.Tesseract.createWorker('eng');
+                    const ret = await worker.recognize(file);
+                    await worker.terminate();
+                    const ocrText = ret.data.text.trim();
+                    window.SidePanelLog.log('p1 stage 1', `Tesseract OCR completed for supporting image: ${file.name} (${ocrText.length} chars).`);
+                    return ocrText || `[Image: ${file.name}]`;
+                }
+            } catch (imgErr) {
+                console.warn('Image OCR error for supporting doc:', imgErr);
+            }
+        }
+
+        // Default fallback: read text
+        try {
+            return await file.text();
+        } catch (e) {
+            return `[File: ${file.name}]`;
+        }
+    },
+
+    async handleCustomContextFilesUpload(filesList) {
+        const filesArray = Array.from(filesList);
+        for (const file of filesArray) {
+            window.SidePanelLog.log('p1 stage 1', `Processing supporting doc: ${file.name}...`);
+            const text = await this.extractTextFromSupportingFile(file);
             
             const fileId = 'custom_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
             this.customFiles.push({
@@ -174,7 +233,10 @@ window.Stage1DocumentSelector = {
         for (const odFile of odFiles) {
             try {
                 const res = await fetch(odFile["@microsoft.graph.downloadUrl"]);
-                const text = await res.text();
+                const blob = await res.blob();
+                const file = new File([blob], odFile.name, { type: blob.type || this.getMimeType(odFile.name) });
+                const text = await this.extractTextFromSupportingFile(file);
+
                 const fileId = 'custom_od_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
                 this.customFiles.push({
                     id: fileId,

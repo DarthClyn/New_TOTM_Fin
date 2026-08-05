@@ -607,16 +607,17 @@ Example: { "ENTERT": "78050200", "MEAL": "78050200", "UNKNOWN": "MANUAL" }`,
         }
 
         let tableHtml = `
-            <table class="match-data-table">
-                <thead>
-                    <tr>
-                        <th>Claim Group Code</th>
-                        <th>Group Name</th>
-                        <th>Mapped GL Code</th>
-                        <th>Source</th>
-                    </tr>
-                </thead>
-                <tbody>
+            <div style="width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color); border-radius: 8px;">
+                <table class="match-data-table" style="width: 100%; min-width: 1100px;">
+                    <thead>
+                        <tr>
+                            <th>Claim Group Code</th>
+                            <th>Group Name</th>
+                            <th>Mapped GL Code</th>
+                            <th>Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
         `;
 
         groups.forEach(group => {
@@ -656,7 +657,7 @@ Example: { "ENTERT": "78050200", "MEAL": "78050200", "UNKNOWN": "MANUAL" }`,
             `;
         });
 
-        tableHtml += `</tbody></table>`;
+        tableHtml += `</tbody></table></div>`;
         document.getElementById('stage3Content').innerHTML = tableHtml;
     },
 
