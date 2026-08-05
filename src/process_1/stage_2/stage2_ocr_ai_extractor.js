@@ -16,7 +16,7 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
 2. DO NOT EXTRACT SUPPORTING DOC FIELDS: Do NOT extract fields belonging to contract agreements, delivery orders, or purchase orders. Focus strictly on the invoice itself.
 3. DO NOT INCLUDE MISSING FIELDS: If a field is missing, omit it completely from JSON output. Do NOT output null, "N/A", or empty values.
 4. SYNONYM MAPPING: Map keys smartly to clean snake_case identifiers.
-5. Output ONLY valid JSON without markdown wrapping.`,
+5. OUTPUT ONLY VALID RAW JSON: Output ONLY a raw valid JSON object starting with '{' and ending with '}' without any markdown, codeblocks, introductory, or conversational text.`,
 
     extractedOcrText: '',
     extractedData: null,
@@ -94,7 +94,7 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
 
             // 3. Scanned PDF or Image Documents: Fallback to Tesseract OCR
             if (ocrProgressStatus) ocrProgressStatus.textContent = 'Scanned document detected. Running Tesseract OCR...';
-            
+
             let ocrInput = file;
             if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
                 const pdfCanvas = document.getElementById('pdfCanvas');
@@ -221,7 +221,12 @@ CRITICAL INVOICE-ONLY EXTRACTION RULES:
 
     renderResults(rawContent) {
         let cleanJson = rawContent;
-        if (cleanJson.includes('```')) {
+        const firstBrace = cleanJson.indexOf('{');
+        const lastBrace = cleanJson.lastIndexOf('}');
+
+        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+            cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
+        } else if (cleanJson.includes('```')) {
             cleanJson = cleanJson.replace(/```json/gi, '').replace(/```/g, '').trim();
         }
 
