@@ -47,7 +47,7 @@ window.Stage1ClaimsIngestion = {
                         const sheetName = workbook.SheetNames[0];
                         const worksheet = workbook.Sheets[sheetName];
                         const jsonRows = window.XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, defval: '' });
-                        this.parseRowsArray(jsonRows);
+                        this.parseRowsArray(jsonRows, 'excel');
                     } else {
                         alert('Excel parser library (XLSX) loading. Please try again in a moment.');
                     }
@@ -373,10 +373,10 @@ window.Stage1ClaimsIngestion = {
             rows.push(currentRow);
         }
 
-        this.parseRowsArray(rows);
+        this.parseRowsArray(rows, 'csv');
     },
 
-    parseRowsArray(rows) {
+    parseRowsArray(rows, source = 'csv') {
         if (!rows || rows.length === 0) return;
 
         this.parsedSubTotalGst = null;
@@ -418,20 +418,26 @@ window.Stage1ClaimsIngestion = {
             }
         }
 
-        // Detect column indices for Remarks (AF) and Officer's Comment (AG) from header rows
-        let remarksColIdx = -1;
-        let officerColIdx = -1;
-        for (let h = 0; h < Math.min(rows.length, 5); h++) {
-            const headerCols = rows[h].map(c => String(c).toUpperCase().trim());
-            const rIdx = headerCols.indexOf('REMARKS');
-            const oIdx = headerCols.findIndex(c => c === "OFFICER'S COMMENT" || c === "OFFICERS COMMENT" || c === "OFFICER COMMENT");
-            if (rIdx > -1) remarksColIdx = rIdx;
-            if (oIdx > -1) officerColIdx = oIdx;
-            if (remarksColIdx > -1 && officerColIdx > -1) break;
+        // Determine column indices for Remarks and Officer's Comment based on source
+        let remarksColIdx = 31;  // CSV default: AF
+        let officerColIdx = 32;  // CSV default: AG
+
+        if (source === 'excel') {
+            // For Excel, detect columns dynamically from header rows
+            remarksColIdx = -1;
+            officerColIdx = -1;
+            for (let h = 0; h < Math.min(rows.length, 20); h++) {
+                const headerCols = rows[h].map(c => String(c).toUpperCase().trim());
+                for (let ci = 0; ci < headerCols.length; ci++) {
+                    if (headerCols[ci] === 'REMARKS' || headerCols[ci] === 'REMARK') remarksColIdx = ci;
+                    if (headerCols[ci].includes('OFFICER') && headerCols[ci].includes('COMMENT')) officerColIdx = ci;
+                }
+                if (remarksColIdx > -1 && officerColIdx > -1) break;
+            }
+            // Excel fallback if headers not found
+            if (remarksColIdx === -1) remarksColIdx = 19;  // Column T
+            if (officerColIdx === -1) officerColIdx = 22;  // Column W
         }
-        // Fallback to AF(31) and AG(32) if headers not found
-        if (remarksColIdx === -1) remarksColIdx = 31;
-        if (officerColIdx === -1) officerColIdx = 32;
 
         for (let i = 0; i < rows.length; i++) {
             const rowCells = rows[i];
@@ -515,10 +521,12 @@ window.Stage1ClaimsIngestion = {
                 const status = itemCols.find(c => ['APPROVED', 'PENDING', 'REJECTED'].includes(c.toUpperCase())) || 'Approved';
                 const approver = itemCols.find(c => c.toUpperCase().includes('LAU') || c.toUpperCase().includes('FREDERIC')) || 'FREDERIC K LAU SI';
 
-                // Remarks = Column AF (index 31), Officer's Comment = Column AG (index 32)
-                let remarks = (cols.length > 31 && cols[31]) ? cols[31].trim() : '';
-                let commentOrRemarks = (cols.length > 32 && cols[32]) ? cols[32].trim() : '';
-                console.log(`Row ${i}: cols.length=${cols.length}, AF[31]="${cols[31] || ''}", AG[32]="${cols[32] || ''}"`);
+                // Remarks & Officer's Comment — read from source-specific column indices
+                let remarks = (cols.length > remarksColIdx && cols[remarksColIdx]) ? cols[remarksColIdx].trim() : '';
+                let commentOrRemarks = (cols.length > officerColIdx && cols[officerColIdx]) ? cols[officerColIdx].trim() : '';
+                // Clear if it's just the header label repeated
+                if (remarks.toUpperCase() === 'REMARKS') remarks = '';
+                if (commentOrRemarks.toUpperCase().includes('OFFICER') && commentOrRemarks.toUpperCase().includes('COMMENT')) commentOrRemarks = '';
 
                 let claimAmt = '0.00';
                 let gstAmt = '0.00';
