@@ -418,6 +418,21 @@ window.Stage1ClaimsIngestion = {
             }
         }
 
+        // Detect column indices for Remarks (AF) and Officer's Comment (AG) from header rows
+        let remarksColIdx = -1;
+        let officerColIdx = -1;
+        for (let h = 0; h < Math.min(rows.length, 5); h++) {
+            const headerCols = rows[h].map(c => String(c).toUpperCase().trim());
+            const rIdx = headerCols.indexOf('REMARKS');
+            const oIdx = headerCols.findIndex(c => c === "OFFICER'S COMMENT" || c === "OFFICERS COMMENT" || c === "OFFICER COMMENT");
+            if (rIdx > -1) remarksColIdx = rIdx;
+            if (oIdx > -1) officerColIdx = oIdx;
+            if (remarksColIdx > -1 && officerColIdx > -1) break;
+        }
+        // Fallback to AF(31) and AG(32) if headers not found
+        if (remarksColIdx === -1) remarksColIdx = 31;
+        if (officerColIdx === -1) officerColIdx = 32;
+
         for (let i = 0; i < rows.length; i++) {
             const rowCells = rows[i];
             if (!rowCells || rowCells.length === 0) continue;
@@ -500,9 +515,10 @@ window.Stage1ClaimsIngestion = {
                 const status = itemCols.find(c => ['APPROVED', 'PENDING', 'REJECTED'].includes(c.toUpperCase())) || 'Approved';
                 const approver = itemCols.find(c => c.toUpperCase().includes('LAU') || c.toUpperCase().includes('FREDERIC')) || 'FREDERIC K LAU SI';
 
-                // Comment & Remarks
-                const commentOrRemarks = itemCols.find(c => c.toUpperCase().includes('ORDER') || c.toUpperCase().includes('INV') || c.toUpperCase().includes('SLIP') || c.length > 20) || '';
-                const remarks = itemCols.find(c => c.length > 10 && c !== commentOrRemarks && !c.toUpperCase().includes('CLM') && !c.toUpperCase().includes('APPROVED') && !c.toUpperCase().includes('EMPLOYEE')) || '';
+                // Remarks = Column AF (index 31), Officer's Comment = Column AG (index 32)
+                let remarks = (cols.length > 31 && cols[31]) ? cols[31].trim() : '';
+                let commentOrRemarks = (cols.length > 32 && cols[32]) ? cols[32].trim() : '';
+                console.log(`Row ${i}: cols.length=${cols.length}, AF[31]="${cols[31] || ''}", AG[32]="${cols[32] || ''}"`);
 
                 let claimAmt = '0.00';
                 let gstAmt = '0.00';
